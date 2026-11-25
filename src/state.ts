@@ -1,6 +1,8 @@
-import { compile, template, names, type Card, type Segment } from './timeline';
+import { compile, names, type Card, type Segment } from './timeline';
+import { standardShow } from './freeShow';
 
-const STORAGE_KEY = 'liyu-show-v2';
+// v3：預設改為「鯉魚秀（新）」，舊版存檔不再自動載入（原版可按按鈕叫回）
+const STORAGE_KEY = 'liyu-show-v3';
 
 /** 從 localStorage 讀回節目單；格式不符時回傳 null。 */
 function loadCards(): { cards: Card[] | null; warning: string } {
@@ -41,7 +43,7 @@ const loaded = loadCards();
 
 /** 全頁共用的播放與編排狀態。 */
 export const show = {
-  cards: loaded.cards ?? template(),
+  cards: loaded.cards ?? standardShow(),
   segments: [] as Segment[],
   time: 0,
   playing: false,
