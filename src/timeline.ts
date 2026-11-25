@@ -1,14 +1,20 @@
-export const names = ['慢速亮相','依序接力','左右對拍','十球開花','快走急停','觀眾倒數','雙波衝線','定格謝幕'];
-export const durations = [6,8,8,8,8,7,8,7];
-export const summaries = ['第一對緩緩前進，點亮舞台','2 至 5 號依序成對出發','左隊先走，右隊跟上，兩次對拍','單數向外、定格，再收回來','十球退至急停點，整齊停住','保持隊形，迎接 3、2、1','單數先衝，雙數接力到站','揮手、鞠躬，向觀眾致謝'];
+export const names = ['慢速亮相','依序接力','左右對拍','十球開花','快走急停','觀眾倒數','雙波衝線','定格謝幕','波浪點燈','左右問答','交錯開合','假動作急停','節拍蓄力'];
+export const durations = [6,8,8,8,8,7,8,7,8,8,8,6,8];
+export const summaries = ['第一對緩緩前進，點亮舞台','2 至 5 號依序成對出發','左隊先走，右隊跟上，兩次對拍','單數向外、定格，再收回來','十球退至急停點，整齊停住','保持隊形，迎接 3、2、1','單數先衝，雙數接力到站','揮手、鞠躬，向觀眾致謝','五對球依序推進，再反向掀起波浪','左問右答，兩輪加速逼近內點','單雙交錯開合，最後一起收攏','先快退、突然收回，再整齊急停','短促脈衝三連拍，蓄力等待衝線'];
 export type Card = {id:string;type:number;duration:number};
 export type Segment = {id:string;cardId:string;type:number;start:number;end:number;from:number[];to:number[];transition:boolean};
-export const template = ():Card[] => durations.map((duration,type)=>({id:crypto.randomUUID(),type,duration}));
+export const template = ():Card[] => durations.slice(0,8).map((duration,type)=>({id:crypto.randomUUID(),type,duration}));
+export const energetic = ():Card[] => [8,9,10,11,12,5,6,7].map(type=>({id:crypto.randomUUID(),type,duration:durations[type]}));
 const all = (d:number)=>Array(10).fill(d) as number[];
-const initial = (type:number):number[]|null => type===0?all(1):type===1?all(1).map((v,i)=>i%5===0?2:v):type===2?all(2):type===3||type===4?all(3.8):type===6?all(3.3):null;
+const initial = (type:number):number[]|null => type===8?all(1):type===9?all(2):type===10||type===11?all(3.8):type===12?all(3.3):type===0?all(1):type===1?all(1).map((v,i)=>i%5===0?2:v):type===2?all(2):type===3||type===4?all(3.8):type===6?all(3.3):null;
 const lerp = (a:number,b:number,t:number)=>a+(b-a)*Math.max(0,Math.min(1,t));
 export function motion(type:number,t:number,from:number[]):number[]{
  return from.map((d,i)=>{const n=i%5;const left=i<5;
+  if(type===8){const start=n*0.35;return t<4?lerp(d,2,(t-start)/0.8):t<6?lerp(2,2.9,(t-4-(4-n)*0.2)/0.55):lerp(2.9,2,(t-6-n*0.15)/0.6);}
+  if(type===9){const offset=left?0:1;return t<4?lerp(d,2.9,(t-offset)/0.65):lerp(2.9,3.8,(t-4-offset*0.5)/0.45);}
+  if(type===10){if(t>=6)return 3.8;const phase=t%3,delay=n%2===0?0:0.4;if(phase<1.3)return lerp(3.8,2,(phase-delay)/0.6);return lerp(2,3.8,(phase-1.3-delay)/0.6);}
+  if(type===11){if(t<0.7)return lerp(d,2.5,t/0.7);if(t<1.1)return 2.5;if(t<1.8)return lerp(2.5,3.8,(t-1.1)/0.7);if(t<3)return 3.8;return lerp(3.8,3.3,(t-3)/0.5);}
+  if(type===12){if(t>=6)return 3.3;const beat=t%2;const offset=left?0:0.25;return beat<offset?3.3:beat<offset+0.45?lerp(3.3,2.8,(beat-offset)/0.45):lerp(2.8,3.3,(beat-offset-0.45)/0.45);}
   if(type===0&&n===0)return lerp(d,2,(t-1)/4);
   if(type===1&&n>0)return lerp(d,2,(t-(n-1)*2)/2);
   if(type===2){const first=left?0:2, second=left?4:6;return t<second?lerp(d,2.9,(t-first)/1.5):lerp(2.9,3.8,(t-second)/1.5);}
@@ -39,6 +45,11 @@ export function sample(segments:Segment[],time:number){
  else if(segment.type===4)subtitle=t<1?'快走！':'停！';
  else if(segment.type===5){subtitle='觀眾一起倒數！';countdown=t>=4&&t<7?String(3-Math.floor(t-4)):'';}
  else if(segment.type===6)subtitle=t<1?'衝！':t<2.5?'第二波跟上！':'十球到站！';
+ else if(segment.type===8)subtitle=t<4?'一對接一對，波浪出發！':t<6?'反向接力！':'一起收回！';
+ else if(segment.type===9)subtitle=t<4?(t<1?'左隊出題！':'右隊回答！'):(t<4.5?'加速，左！':'加速，右！');
+ else if(segment.type===10)subtitle=t>=6.5?'十球合拍！':t%4<2?'交錯打開！':'收回，再一次！';
+ else if(segment.type===11)subtitle=t<1.1?'退！':t<1.8?'收！':t<3?'別急，等一下……':'快走，停！';
+ else if(segment.type===12)subtitle=t<6?['第一拍！','第二拍！','第三拍！'][Math.floor(t/2)]:'準備，全場一起倒數！';
  else if(segment.type===7)subtitle='掌聲送給鯉魚機器人隊！';
  return {positions,subtitle,countdown,segment,local:t};
 }
