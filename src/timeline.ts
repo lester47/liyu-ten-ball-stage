@@ -31,9 +31,41 @@ export function compile(cards:Card[]):Segment[]{
   const to=motion(card.type,durations[card.type],state);segments.push({id:card.id,cardId:card.id,type:card.type,start:time,end:time+card.duration,from:[...state],to,transition:false});state=to;time+=card.duration;
  }return segments;
 }
+export const rainbow = ['#16a5ef','#7658ed','#df52ba','#13b8a6','#73b82e','#ff933b','#ee5267','#d39c13','#c55ce0','#138cb8'];
+// Small-action targets use the same normalized local time as motion().
+export function targets(type:number,t:number,from:number[]):number[]{
+ return from.map((d,i)=>{const n=i%5,left=i<5;
+  if(type===0)return n===0?2:d;
+  if(type===1)return n>0?2:d;
+  if(type===2)return t<(left?4:6)?2.9:3.8;
+  if(type===3)return n%2===0?(t<4?2:3.8):d;
+  if(type===4)return 3.3;
+  if(type===6)return 1;
+  if(type===8)return t<4?2:t<6?2.9:2;
+  if(type===9)return t<4?2.9:3.8;
+  if(type===10)return t>=6?3.8:t%3<1.3?2:3.8;
+  if(type===11)return t<1.1?2.5:t<3?3.8:3.3;
+  if(type===12)return t>=6?3.3:t%2<(left?0:0.25)+0.45?2.8:3.3;
+  return d;
+ });
+}
+function lighting(type:number,t:number,positions:number[]){
+ const colors=[...rainbow],brightness=all(1);
+ for(let i=0;i<10;i++){const n=i%5,left=i<5;
+  if(type===0||type===8)brightness[i]=Math.max(0,Math.min(1,(t-n*0.15)/0.3));
+  if(type===1&&n>0&&t>=(n-1)*2&&t<(n-1)*2+0.25)colors[i]='#ffffff';
+  if(type===2||type===9){const leftOn=type===2?t<2||t>=4&&t<6:t<1||t>=4&&t<4.5;brightness[i]=left===leftOn?1:0.18;}
+  if((type===3||type===10)&&n%2===0)colors[i]='#fff1fc';
+  if(type===4&&t>=1&&t<1.35)colors[i]='#ff263c';
+  if(type===5&&t>=4&&t<7)colors[i]=['#ff304b','#ffcc19','#23d77e'][Math.floor(t-4)];
+  if(type===6){colors[i]=positions[i]<=1.001?'#ffd34e':rainbow[i];brightness[i]=1.3;}
+  if(type===7)colors[i]=rainbow[(i+Math.floor(t*2))%10];
+ }
+ return {colors,brightness};
+}
 export function sample(segments:Segment[],time:number){
  const segment=segments.find(s=>time>=s.start&&time<s.end)??(time>=0?segments.at(-1):undefined);
- if(!segment)return {positions:all(1),subtitle:'準備好，讓十顆球一起上場',countdown:'',segment:undefined,local:0};
+ if(!segment)return {positions:all(1),subtitle:'準備好，讓十顆球一起上場',countdown:'',segment:undefined,local:0,targets:all(1),colors:[...rainbow],brightness:all(0.35),finishLit:all(0)};
  const progress=Math.max(0,Math.min(1,(time-segment.start)/(segment.end-segment.start)));const t=progress*durations[segment.type];
  const positions=segment.transition?segment.from.map((d,i)=>lerp(d,segment.to[i],progress)):motion(segment.type,t,segment.from);
  let subtitle=names[segment.type],countdown='';
@@ -47,9 +79,15 @@ export function sample(segments:Segment[],time:number){
  else if(segment.type===6)subtitle=t<1?'衝！':t<2.5?'第二波跟上！':'十球到站！';
  else if(segment.type===8)subtitle=t<4?'一對接一對，波浪出發！':t<6?'反向接力！':'一起收回！';
  else if(segment.type===9)subtitle=t<4?(t<1?'左隊出題！':'右隊回答！'):(t<4.5?'加速，左！':'加速，右！');
- else if(segment.type===10)subtitle=t>=6.5?'十球合拍！':t%4<2?'交錯打開！':'收回，再一次！';
+ else if(segment.type===10)subtitle=t>=6?'十球合拍！':t%3<1.3?'交錯打開！':'收回，再一次！';
  else if(segment.type===11)subtitle=t<1.1?'退！':t<1.8?'收！':t<3?'別急，等一下……':'快走，停！';
  else if(segment.type===12)subtitle=t<6?['第一拍！','第二拍！','第三拍！'][Math.floor(t/2)]:'準備，全場一起倒數！';
  else if(segment.type===7)subtitle='掌聲送給鯉魚機器人隊！';
- return {positions,subtitle,countdown,segment,local:t};
+ const goal=segment.transition?segment.to:targets(segment.type,t,segment.from);
+ let lights=lighting(segment.type,t,positions);
+ if(segment.transition){const previous=segments[segments.indexOf(segment)-1];lights=previous?lighting(previous.type,durations[previous.type],previous.to):{colors:[...rainbow],brightness:all(0.5)};lights.brightness=lights.brightness.map(v=>v*0.55);}
+ const index=segments.indexOf(segment);let finishLit=all(0);
+ if(!segment.transition&&segment.type===6)finishLit=positions.map(d=>d<=1.001?1:0);
+ if(!segment.transition&&segment.type===7){let prev=index-1;while(prev>=0&&!segments[prev].transition&&segments[prev].type===7)prev--;if(prev>=0&&!segments[prev].transition&&segments[prev].type===6)finishLit=all(1);}
+ return {positions,subtitle,countdown,segment,local:t,targets:goal,...lights,finishLit};
 }
