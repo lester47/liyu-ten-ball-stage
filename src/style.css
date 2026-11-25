@@ -829,6 +829,27 @@ aside {
   color: var(--ink);
 }
 
+/* ---------- 全螢幕：只留舞台、時間軸與播放控制 ---------- */
+body.stage-only .top,
+body.stage-only aside {
+  display: none;
+}
+body.stage-only main {
+  display: flex;
+  height: 100dvh;
+  padding: 10px;
+}
+body.stage-only .stage-panel {
+  flex: 1;
+  height: 100%;
+}
+body.stage-only #viewport {
+  min-height: 0;
+}
+#stage-only b {
+  font-weight: inherit;
+}
+
 /* ---------- 平板直向與手機：上下排 ---------- */
 @media (max-width: 1000px) {
   .top {
@@ -871,4 +892,13 @@ aside {
     width: 100%;
     order: 5;
   }
+}
+
+/* 全螢幕在各種螢幕大小都撐滿整個畫面 */
+body.stage-only main {
+  height: 100dvh;
+}
+body.stage-only #viewport {
+  flex: 1;
+  height: auto;
 }

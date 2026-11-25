@@ -4,9 +4,10 @@
  */
 import { ease, lanePts, lerpPt, type FreeCard, type Mark, type Pt, type ShowId } from './shows/kit';
 import { koiCards, koiExtraCards } from './shows/koi';
+import { danceFor, type DanceMove } from './shows/dance';
 import { fireworkCards, gardenCards, trainCards } from './shows/more';
 
-export type { FreeCard, Mark, Pt, ShowId };
+export type { DanceMove, FreeCard, Mark, Pt, ShowId };
 export { lanePts, lerpPt };
 
 export const FREE_FIRST = 13;
@@ -45,11 +46,13 @@ export const freeLights = (type: number, t: number) => freeCard(type).lights(t);
 export const freeSubtitle = (type: number, t: number) => freeCard(type).subtitle(t);
 /** 鯉魚道具出現程度 0–1。 */
 export const koiProp = (type: number, t: number) => (isFree(type) ? (freeCard(type).koi?.(t) ?? 0) : 0);
+/** 伴舞學生在這段的舞步。 */
+export const freeDance = (type: number, t: number) => danceFor(freeCard(type).show, freeCard(type).name, t);
 export const isBow = (type: number) => isFree(type) && !!freeCard(type).bow;
 
 /** 各套節目：名稱、按鈕文字與一句介紹。 */
 export const SHOWS: { id: ShowId; label: string; title: string; blurb: string }[] = [
-  { id: 'koi', label: '🐟 鯉魚秀', title: '鯉魚十球秀', blurb: '前進後退、拉鍊、圍圈、排出一條大鯉魚' },
+  { id: 'koi', label: '🐟 鯉魚秀', title: '鯉魚十球秀', blurb: '圍著大鯉魚游、到中間集合、排出魚形' },
   { id: 'garden', label: '🌈 彩虹花園', title: '彩虹花園', blurb: '種子發芽、排成大花、花開花合，移動最少' },
   { id: 'train', label: '🚂 小火車', title: '小火車開動', blurb: '跟著前一顆繞一圈，再分兩列交會、進站' },
   {

@@ -129,3 +129,9 @@ test('自由走位與球道節目可以混排：自動換位、倒數沿用自�
   assert.equal(sample(s, 1).tip, undefined);
   assert.equal(s.find((x) => x.id === free[3].id)!.type, FREE_FIRST + 3);
 });
+
+import { FREE_CARDS } from './freeShow.ts';
+import { hasDance } from './shows/dance.ts';
+test('每一段自由走位都有配好伴舞學生的舞步', () => {
+  for (const c of FREE_CARDS) assert.ok(hasDance(c.show, c.name), `${c.show}:${c.name}`);
+});
