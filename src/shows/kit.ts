@@ -12,7 +12,7 @@ export type Lights = { colors: string[]; brightness: number[] };
 
 /** 地上膠帶記號。color 為 'team' 時依左右隊上色。 */
 export type Mark =
-  | { k: 'ring'; rx: number; rz?: number; n?: number; color?: string }
+  | { k: 'ring'; rx: number; rz?: number; n?: number; color?: string; cx?: number; cz?: number }
   | { k: 'x'; pts: Pt[]; color?: string }
   | { k: 'line'; z: number; x0?: number; x1?: number; color?: string; width?: number }
   | { k: 'dot'; pts: Pt[]; color?: string; size?: number }
