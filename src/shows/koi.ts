@@ -1,202 +1,203 @@
 /*
- * 鯉魚十球秀（新）：
- * 前進 → 後退 → 拉鍊穿插 → 圍圈圈 → 繞圈圈 → 到中間集合 → 排魚造型 → 到前面排一直線 → 謝幕
+ * 鯉魚十球秀：舞台中間一開始就放著一條大鯉魚，整套節目都圍著牠。
+ * 燈亮出發 → 游到鯉魚身邊 → 跟鯉魚打招呼 → 繞著鯉魚游 → 鯉魚吐泡泡
+ * → 貼著鯉魚排出魚形 → 跟鯉魚一起呼吸 → 到前面排一直線 → 謝幕
  */
 import {
+  angOf,
   atD,
   bowLights,
-  C,
   clamp01,
   ease,
   GOLD,
   HOME,
   ids,
-  laneZ,
   lerpPt,
   lights,
   lineUp,
   matchByAngle,
   polar,
   RAINBOW,
-  TEAM_L,
-  TEAM_R,
-  angOf,
   type FreeCard,
   type Pt,
 } from './kit';
 
-const FORWARD = ids.map((i) => atD(i, 3));
-const BACK = ids.map((i) => atD(i, 1.4));
-/** 拉鍊：藍隊在球道偏後、橘隊偏前，十條半路間距一樣（0.75 m），各自直直開到對面。 */
-const ZIP_OFFSET = 0.375;
-export const zipLane = (i: number) => laneZ(i % 5) + (i < 5 ? -ZIP_OFFSET : ZIP_OFFSET);
-const ZIP_START = ids.map((i) => ({ x: BACK[i].x, z: zipLane(i) }));
-const ZIP_END = ids.map((i) => ({ x: i < 5 ? 7 : 3, z: zipLane(i) }));
-
-export const RING_R = 2.7;
-const RING = ids.map((k) => polar((k * Math.PI) / 5 + Math.PI / 10, RING_R));
-const RING_A = matchByAngle(ZIP_END, RING);
-const TURN = Math.PI * 0.6; // 繞圈圈：一起轉約三分之一圈
-const ringAt = (i: number, f: number, r = RING_R): Pt => polar(angOf(RING_A[i]) + TURN * f, r);
-const RING_END = ids.map((i) => ringAt(i, 1));
-const HUDDLE = ids.map((i) => ringAt(i, 1, 1.6));
 /**
- * 地上的平面大鯉魚：Lester 提供的圓胖小鯉魚圖（魚頭朝右），放大平鋪在舞台中間。
- * 圖片中心與尺寸（公尺）；身體約 5.6 公尺寬，連尾巴約 7.3 公尺長。
+ * 地上的鯉魚：Lester 提供的圓胖小鯉魚圖（魚頭朝右），平鋪在舞台中間。
+ * 圖片中心與尺寸（公尺）；魚身約 3.3 公尺寬，連尾巴約 4.3 公尺長。
  */
-export const KOI_IMAGE = { x: 5.208, z: 3.788, w: 10.948, h: 6.644 };
+export const KOI_IMAGE = { x: 5.128, z: 3.846, w: 6.44, h: 3.908 };
+/** 魚身中心。 */
+export const KOI_CENTER: Pt = { x: 5.3, z: 4 };
+const K = KOI_CENTER;
 /**
- * 魚形 ✕ 點：沿著圖中魚的輪廓（含背鰭、兩片尾鰭）往外 0.28 m，
- * 球停在這些點上就剛好貼著魚邊；點與點至少相距 1.6 m。
+ * 魚形 ✕ 點：沿著圖中魚的輪廓（含背鰭、兩片尾鰭）往外 0.3 m，
+ * 球停在這些點上就剛好貼著魚邊；點與點至少相距 0.99 m。
  */
 export const FISH_MARKS: Pt[] = [
-  { x: 8.48, z: 5.02 },
-  { x: 7.06, z: 6.55 },
-  { x: 5.09, z: 7.0 },
-  { x: 3.26, z: 6.21 },
-  { x: 0.92, z: 4.86 },
-  { x: 0.97, z: 3.25 },
-  { x: 3.32, z: 1.79 },
-  { x: 4.99, z: 0.43 },
-  { x: 6.95, z: 1.32 },
-  { x: 8.45, z: 2.86 },
+  { x: 7.18, z: 4.61 },
+  { x: 6.29, z: 5.59 },
+  { x: 5.04, z: 5.87 },
+  { x: 3.89, z: 5.36 },
+  { x: 2.47, z: 4.5 },
+  { x: 2.5, z: 3.51 },
+  { x: 3.92, z: 2.57 },
+  { x: 4.98, z: 1.73 },
+  { x: 6.22, z: 2.27 },
+  { x: 7.16, z: 3.25 },
 ];
-const FISH = matchByAngle(HUDDLE, FISH_MARKS);
 export const LINE_Z = 6.9;
+
+const FORWARD = ids.map((i) => atD(i, 2));
+/** 圍著鯉魚的大圓圈。 */
+export const KOI_RING_R = 3.1;
+const RING = ids.map((k) => polar((k * Math.PI) / 5 + Math.PI / 10, KOI_RING_R, K));
+const RING_A = matchByAngle(FORWARD, RING, K);
+const TURN = Math.PI * 0.6; // 繞著鯉魚游：一起轉約三分之一圈
+const ringAt = (i: number, f: number, r = KOI_RING_R): Pt => polar(angOf(RING_A[i], K) + TURN * f, r, K);
+const RING_END = ids.map((i) => ringAt(i, 1));
+const NEAR = ids.map((i) => ringAt(i, 0, KOI_RING_R - 0.4));
+const FISH = matchByAngle(RING_END, FISH_MARKS, K);
+/** 呼吸：從魚邊往外 0.35 m。 */
+const BREATH = FISH.map((p) => {
+  const a = angOf(p, K);
+  return { x: p.x + Math.cos(a) * 0.35, z: p.z + Math.sin(a) * 0.35 };
+});
 const LINE = lineUp(FISH, LINE_Z);
 
+const koiAlways = () => 1;
 const rainbow = () => lights(() => {});
-const goMarks = [
-  { k: 'dot' as const, pts: HOME, color: 'team', size: 0.36 },
-  { k: 'tick' as const, pts: FORWARD },
-];
+const ringMark = { k: 'ring' as const, rx: KOI_RING_R, cx: K.x, cz: K.z };
+const fishMark = { k: 'x' as const, pts: FISH_MARKS, color: '#ff7a3d' };
+const lerpAll = (a: Pt[], b: Pt[], f: number) => a.map((p, i) => lerpPt(p, b[i], f));
 
 export const koiCards: FreeCard[] = [
   {
     show: 'koi',
-    name: '前進',
-    duration: 7,
-    summary: '燈亮後一起往前開到舞台中間附近',
-    tip: { kid: '燈亮了，把球往前開到中間附近停下', ok: '停在哪都好，前前後後像一群小魚游出來' },
+    name: '燈亮出發',
+    duration: 6,
+    summary: '燈一顆接一顆亮起，往大鯉魚的方向開一小段',
+    tip: { kid: '燈亮了，把球往大鯉魚的方向開一小段', ok: '開多開少都可以，像小魚好奇地游出來' },
     from: HOME,
     to: FORWARD,
-    move: [1, 4.5],
+    move: [1.6, 4],
     lights: (t) => lights((i, _c, b) => (b[i] = clamp01((t - 0.15 * i) / 0.3))),
-    subtitle: (t) => (t < 1 ? '燈亮囉！' : '一起往前走！'),
-    marks: goMarks,
+    subtitle: (t) => (t < 1.6 ? '大鯉魚在舞台中間！' : '小魚游出來囉'),
+    marks: [{ k: 'tick', pts: FORWARD }],
+    koi: koiAlways,
   },
   {
     show: 'koi',
-    name: '後退',
-    duration: 6,
-    summary: '一起退回自己面前',
-    tip: { kid: '把球往回開，回到自己面前', ok: '退得多、退得少都可以，只要往回走' },
+    name: '游到鯉魚身邊',
+    duration: 7,
+    summary: '開到鯉魚外圍的大圓圈上，把鯉魚圍起來',
+    tip: { kid: '開到鯉魚外面那一圈膠帶附近', ok: '圈圈歪歪的也很好看，像一群小魚圍著大魚' },
     from: FORWARD,
-    to: BACK,
-    move: [0.5, 4.5],
-    lights: rainbow,
-    subtitle: () => '後退～',
-    marks: goMarks,
-  },
-  {
-    show: 'koi',
-    name: '拉鍊穿插',
-    duration: 9,
-    summary: '藍隊走後半條、橘隊走前半條，交錯穿到對面',
-    tip: {
-      kid: '藍隊走球道後半條、橘隊走前半條，直直開到對面',
-      ok: '每人有自己那半條路，歪一點也不會撞到',
-    },
-    from: BACK,
-    to: ZIP_END,
-    // 先各自靠到自己的半條路，再一排接一排穿到對面
-    motion: (t) =>
-      ids.map((i) =>
-        t < 1.6
-          ? lerpPt(BACK[i], ZIP_START[i], ease(t / 1.6))
-          : lerpPt(ZIP_START[i], ZIP_END[i], ease((t - 1.6 - (i % 5) * 0.3) / 5.8)),
-      ),
-    target: (t) => (t < 1.6 ? ZIP_START : ZIP_END),
-    lights: () => lights((i, c) => (c[i] = i < 5 ? TEAM_L : TEAM_R)),
-    subtitle: (t) => (t < 1.6 ? '藍隊靠後、橘隊靠前' : '拉鍊穿插！'),
-    marks: ids.map((i) => ({
-      k: 'line' as const,
-      z: zipLane(i),
-      x0: 1.3,
-      x1: 8.7,
-      color: i < 5 ? TEAM_L : TEAM_R,
-      width: 0.05,
-    })),
-  },
-  {
-    show: 'koi',
-    name: '圍圈圈',
-    duration: 6,
-    summary: '開到地上的圓圈膠帶上',
-    tip: { kid: '開到地上的圓圈膠帶附近', ok: '圓圈歪一點像一朵花，不用很圓' },
-    from: ZIP_END,
     to: RING_A,
-    move: [0.3, 4.6],
+    move: [0.3, 5.8],
     lights: rainbow,
-    subtitle: () => '圍成一個圈圈',
-    marks: [{ k: 'ring', rx: RING_R }],
+    subtitle: () => '游到鯉魚身邊',
+    marks: [ringMark],
+    koi: koiAlways,
   },
   {
     show: 'koi',
-    name: '繞圈圈',
-    duration: 8,
-    summary: '大家朝同一方向慢慢繞',
-    tip: { kid: '大家朝同一個方向慢慢繞', ok: '快一點慢一點都沒關係，像旋轉木馬' },
+    name: '跟鯉魚打招呼',
+    duration: 6,
+    summary: '往鯉魚靠近一小步，閃燈說哈囉，再退回圓圈',
+    tip: { kid: '往鯉魚開一小步，閃燈說哈囉，再退回來', ok: '沒退回原位也沒關係，鯉魚都看到你了' },
+    from: RING_A,
+    to: RING_A,
+    motion: (t) => lerpAll(RING_A, NEAR, ease((t - 0.3) / 2) - ease((t - 3.4) / 2.2)),
+    target: (t) => (t < 3 ? NEAR : RING_A),
+    lights: (t) =>
+      lights(
+        (i, c, b) => (
+          (c[i] = t > 2 && t < 3.6 ? GOLD : RAINBOW[i]),
+          (b[i] = t > 2 && t < 3.6 ? 0.5 + 0.5 * Math.abs(Math.sin(t * 8)) : 1)
+        ),
+      ),
+    subtitle: (t) => (t < 3.4 ? '鯉魚你好！' : '退回圓圈'),
+    marks: [ringMark],
+    koi: koiAlways,
+  },
+  {
+    show: 'koi',
+    name: '繞著鯉魚游',
+    duration: 9,
+    summary: '大家朝同一個方向，繞著鯉魚慢慢游',
+    tip: { kid: '大家朝同一個方向，繞著鯉魚慢慢開', ok: '快一點慢一點都沒關係，像小魚在池塘裡轉圈' },
     from: RING_A,
     to: RING_END,
-    motion: (t) => ids.map((i) => ringAt(i, ease((t - 0.3) / 7.4))),
+    motion: (t) => ids.map((i) => ringAt(i, ease((t - 0.3) / 8.2))),
     lights: (t) => lights((i, c) => (c[i] = RAINBOW[(i + Math.floor(t * 2)) % 10])),
-    subtitle: () => '繞圈圈～',
-    marks: [{ k: 'ring', rx: RING_R }],
+    subtitle: () => '繞著鯉魚游～',
+    marks: [ringMark],
+    koi: koiAlways,
   },
   {
     show: 'koi',
-    name: '到中間集合',
-    duration: 5,
-    summary: '往舞台中間靠攏，圍成小圈',
-    tip: { kid: '往舞台中間開，靠近就停', ok: '擠成一團最可愛，像小魚聚在一起' },
+    name: '鯉魚吐泡泡',
+    duration: 6,
+    summary: '不用移動，燈一顆接一顆閃白、閃藍，像鯉魚吐泡泡',
+    tip: { kid: '輪到你時把燈換成白色或藍色，像一顆泡泡', ok: '閃早閃晚都可以，泡泡本來就亂亂冒' },
     from: RING_END,
-    to: HUDDLE,
-    move: [0.3, 4],
-    lights: rainbow,
-    subtitle: () => '到中間集合！',
-    marks: [{ k: 'ring', rx: 1.6, n: 22 }],
+    to: RING_END,
+    lights: (t) =>
+      lights((i, c, b) => {
+        const k = (t * 3 + i * 0.9) % 3;
+        c[i] = k < 1 ? '#ffffff' : '#16a5ef';
+        b[i] = k < 1 ? 1 : 0.45;
+      }),
+    subtitle: () => '鯉魚吐泡泡～啵啵啵',
+    marks: [ringMark],
+    koi: koiAlways,
   },
   {
     show: 'koi',
-    name: '排魚造型',
-    duration: 7,
-    summary: '老師在地上鋪一條大鯉魚，大家開到魚的邊緣圍著它',
-    tip: {
-      kid: '開到大鯉魚旁邊的 ✕ 點上，貼著魚身、尾巴和背鰭停好',
-      ok: '沒貼準也沒關係，圍在魚旁邊就看得出是一條魚',
-    },
-    from: HUDDLE,
+    name: '貼著鯉魚排魚形',
+    duration: 8,
+    summary: '開到鯉魚邊上的 ✕ 點，貼著魚身、背鰭和尾巴排出魚形',
+    tip: { kid: '開到鯉魚邊上的 ✕ 點，貼著魚身停好', ok: '沒貼準也沒關係，圍在魚旁邊就看得出是一條魚' },
+    from: RING_END,
     to: FISH,
-    move: [0.8, 4.6],
-    lights: (t) => lights((i, c) => (c[i] = t > 5.6 ? GOLD : t > 4.6 ? '#ff7a3d' : RAINBOW[i])),
-    subtitle: (t) => (t < 4.6 ? '鯉魚來了！排魚造型' : '是一條大鯉魚！'),
-    marks: [{ k: 'x', pts: FISH_MARKS, color: '#ff7a3d' }],
-    koi: (t) => clamp01(t / 0.6),
+    move: [0.4, 5.6],
+    lights: (t) => lights((i, c) => (c[i] = t > 6.6 ? GOLD : t > 5.6 ? '#ff7a3d' : RAINBOW[i])),
+    subtitle: (t) => (t < 6 ? '貼著鯉魚排出魚形' : '變成一條發光的大鯉魚！'),
+    marks: [fishMark],
+    koi: koiAlways,
+  },
+  {
+    show: 'koi',
+    name: '跟鯉魚一起呼吸',
+    duration: 7,
+    summary: '往外一小步、再回到魚邊，做兩次，像鯉魚在呼吸',
+    tip: { kid: '往外開一小步，再回到魚邊，做兩次', ok: '一次也很棒，鯉魚的呼吸本來就有大有小' },
+    from: FISH,
+    to: FISH,
+    motion: (t) => {
+      const f = (s: number) => ease((t - s) / 1.4) - ease((t - s - 1.6) / 1.4);
+      return lerpAll(FISH, BREATH, f(0.3) + f(3.6));
+    },
+    target: (t) => ((t > 0.3 && t < 1.9) || (t > 3.6 && t < 5.2) ? BREATH : FISH),
+    lights: (t) => lights((i, c, b) => ((c[i] = GOLD), (b[i] = 0.55 + 0.45 * Math.abs(Math.sin(t * 1.9))))),
+    subtitle: (t) => (Math.floor(t / 1.65) % 2 ? '吐氣～' : '吸氣～'),
+    marks: [fishMark],
+    koi: koiAlways,
   },
   {
     show: 'koi',
     name: '到前面排一直線',
-    duration: 7,
+    duration: 6,
     summary: '開到舞台前面的膠帶線上',
-    tip: { kid: '把球開到舞台前面的膠帶線上', ok: '排得不直也沒關係，像一排小朋友在等拍照' },
+    tip: { kid: '把球開到舞台前面的膠帶線上', ok: '排得不直也沒關係，像一排小魚在等拍照' },
     from: FISH,
     to: LINE,
-    move: [0.2, 6.6],
+    move: [0.2, 5.4],
     lights: rainbow,
     subtitle: () => '到前面排一直線',
     marks: [{ k: 'line', z: LINE_Z }],
-    koi: () => 1,
+    koi: koiAlways,
   },
   {
     show: 'koi',
@@ -209,8 +210,7 @@ export const koiCards: FreeCard[] = [
     lights: (t) => bowLights(t),
     subtitle: () => '謝謝大家！',
     marks: [{ k: 'line', z: LINE_Z }],
-    koi: () => 1,
+    koi: koiAlways,
     bow: true,
   },
 ];
-export { C as KOI_CENTER };

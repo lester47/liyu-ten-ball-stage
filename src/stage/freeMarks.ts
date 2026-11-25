@@ -31,22 +31,21 @@ function strip(
   return mesh;
 }
 
-function dashedRing(parent: THREE.Object3D, rx: number, rz: number, m: THREE.Material, n = 36) {
+function dashedRing(
+  parent: THREE.Object3D,
+  rx: number,
+  rz: number,
+  m: THREE.Material,
+  n = 36,
+  c = { x: FREE_CENTER.x, z: FREE_CENTER.z },
+) {
   for (let k = 0; k < n; k++) {
     const a = ((k + 0.5) / n) * Math.PI * 2;
     // 切線方向：膠帶沿著圓（或橢圓）貼
     const dx = -Math.sin(a) * rx,
       dz = Math.cos(a) * rz;
     const len = ((Math.hypot(dx, dz) * Math.PI * 2) / n) * 0.6;
-    strip(
-      parent,
-      len,
-      0.07,
-      FREE_CENTER.x + Math.cos(a) * rx,
-      FREE_CENTER.z + Math.sin(a) * rz,
-      m,
-      -Math.atan2(dz, dx),
-    );
+    strip(parent, len, 0.07, c.x + Math.cos(a) * rx, c.z + Math.sin(a) * rz, m, -Math.atan2(dz, dx));
   }
 }
 
@@ -86,7 +85,11 @@ function buildMarks(parent: THREE.Object3D, marks: Mark[]) {
   const colored = (color?: string, x = 0) =>
     color === 'team' ? tapeMat(teamOf(x), 0.85) : color ? tapeMat(color, 0.85) : tape;
   for (const m of marks) {
-    if (m.k === 'ring') dashedRing(parent, m.rx, m.rz ?? m.rx, colored(m.color), m.n ?? 36);
+    if (m.k === 'ring')
+      dashedRing(parent, m.rx, m.rz ?? m.rx, colored(m.color), m.n ?? 40, {
+        x: m.cx ?? FREE_CENTER.x,
+        z: m.cz ?? FREE_CENTER.z,
+      });
     if (m.k === 'line') {
       const x0 = m.x0 ?? 0.4,
         x1 = m.x1 ?? 9.6;
