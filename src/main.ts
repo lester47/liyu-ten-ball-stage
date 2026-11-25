@@ -1,87 +1,159 @@
 import * as THREE from 'three';
-import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
-import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
-import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
-import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
-import {OutputPass} from 'three/addons/postprocessing/OutputPass.js';
-import Sortable from 'sortablejs';
-import {compile,sample,template,energetic,names,durations,summaries,type Card} from './timeline';
+import { sample } from './timeline';
+import { show, total } from './state';
+import { $, bindControls, mountMarkup, renderList, updateHud } from './ui';
+import { buildWorld, createRenderer, laneZ, setView } from './stage/world';
+import { createSphero } from './stage/sphero';
+import { createKid } from './stage/kid';
+import { radialTexture } from './stage/labels';
 import './style.css';
-const $=<T extends HTMLElement=HTMLElement>(s:string)=>document.querySelector<T>(s)!;
-let cards:Card[]=template();let storageWarning='';
-try{const saved=localStorage.getItem('liyu-show-v2');if(saved){const parsed=JSON.parse(saved);if(Array.isArray(parsed)&&parsed.every(c=>typeof c.id==='string'&&Number.isInteger(c.type)&&c.type>=0&&c.type<names.length&&Number.isFinite(c.duration)&&c.duration>=(c.type===5?5:1)&&c.duration<=300)&&new Set(parsed.map(c=>c.id)).size===parsed.length)cards=parsed;}}catch{storageWarning='瀏覽器無法讀取儲存資料，本次仍可編排。';}
-let segments=compile(cards),time=0,playing=false,speed=1,previewEnd:number|null=null,selected=-1;
-const total=()=>segments.at(-1)?.end??0;
-document.querySelector('#app')!.innerHTML=`<header><div class="brand"><span class="logo">鯉</span><div><h1>鯉魚十球秀 <span>3D 排練舞台</span></h1><p>十顆球，一起完成精彩的演出。</p></div></div><span class="tag">虛擬排練 · 無需連接機器人</span></header><main><section class="stage-panel"><div class="stage-top"><span class="eyebrow">LIVE STAGE / 環場舞台</span><span class="teams"><b>● 藍隊 L</b><b>● 橘隊 R</b></span></div><div id="viewport"><div class="caption"><span id="phase">準備上場</span><h2 id="subtitle"></h2><strong id="countdown"></strong></div><div id="selection">點選一顆球，查看走位</div><div class="gesture">拖曳旋轉 · 滾輪縮放 · 右鍵平移</div></div><div class="views" aria-label="相機視角">${['觀眾席','正上方','左側','右側','視角重設','家長視角'].map((x,i)=>`<button data-view="${i}">${x}</button>`).join('')}</div><section class="transport"><div class="play-row"><button id="restart" class="primary">從頭表演</button><button id="play">播放</button><span id="clock"></span><label>速度 <select id="speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="1.5">1.5×</option></select></label></div><input id="scrub" type="range" min="0" max="60" step="0.01" value="0" aria-label="播放進度"><div id="timeline"></div><div class="timeline-labels"><span>0 秒</span><span id="end-label">60 秒</span></div></section></section><aside><div class="section-head"><div><span class="eyebrow">PROGRAM LIBRARY</span><h2>節目庫 <small>13 種小單元</small></h2></div><span class="hint">拖曳或點加入</span></div><details class="library-section" open><summary>展開／收合節目庫</summary><div id="library">${names.map((name,i)=>`<article class="library-card" data-type="${i}"><div><h3>${name}<span>${durations[i]} 秒</span></h3><p>${summaries[i]}</p><small>${i===0?'L1 · R1':i===1?'L2–L5 · R2–R5':i===3?'單數移動 · 雙數定格':'L1–L5 · R1–R5'}</small></div><button data-add="${i}" aria-label="加入${name}">加入</button></article>`).join('')}</div></details><div class="section-head playlist-head"><div><span class="eyebrow">YOUR SHOW</span><h2>我的節目單</h2></div><div class="template-buttons"><button id="energetic" class="primary">節奏秀 60 秒</button><button id="reset">原版 60 秒</button></div></div><div class="summary"><strong id="total"></strong><span id="difference"></span></div><div id="playlist"></div><p id="save-status" role="status">${storageWarning||'編輯後自動儲存在此瀏覽器'}</p></aside></main>`;
-function edit(){playing=false;previewEnd=null;time=0;segments=compile(cards);try{localStorage.setItem('liyu-show-v2',JSON.stringify(cards));$('#save-status').textContent='已儲存 · 可隨時繼續編排';}catch{$('#save-status').textContent='無法儲存，重新整理會遺失此次編排';}renderList();}
-function renderList(){
- $('#total').textContent=`${Number(total().toFixed(1))} 秒`;const delta=total()-60;$('#difference').textContent=delta===0?'剛好 60 秒':`${delta>0?'超出':'少於'} 60 秒範本 ${Math.abs(delta).toFixed(1).replace('.0','')} 秒`;
- $('#playlist').innerHTML=cards.length?cards.map((c,i)=>{const s=segments.find(s=>s.id===c.id)!;const m=segments.find(s=>s.cardId===c.id&&s.transition);return `<article class="show-card" data-id="${c.id}">${m?`<div class="move-note">換位 ${m.start.toFixed(1)}–${m.end.toFixed(1)} 秒 · 自動 2 秒</div>`:''}<div class="card-title"><button class="handle" aria-label="拖曳排序${names[c.type]}">⠿</button><span class="order">${String(i+1).padStart(2,'0')}</span><h3>${names[c.type]}</h3><button data-action="delete" aria-label="刪除${names[c.type]}">刪除</button></div><div class="card-settings"><span>${s.start.toFixed(1)}–${s.end.toFixed(1)} 秒</span><label>時長 <input type="number" min="${c.type===5?5:1}" max="300" step="0.5" value="${c.duration}" aria-label="${names[c.type]}時長"> 秒</label></div><div class="card-actions"><button data-action="up" ${i===0?'disabled':''}>上移</button><button data-action="down" ${i===cards.length-1?'disabled':''}>下移</button><button data-action="preview">預覽本段</button></div></article>`;}).join(''):'<div class="empty">節目單還是空白的<br>從上方加入一個小單元開始吧。</div>';
- $('#timeline').innerHTML=segments.map(s=>`<button title="${s.transition?'換位':names[s.type]} ${s.start}–${s.end} 秒" data-time="${s.start}" style="flex:${s.end-s.start}" class="${s.transition?'transition':''}"></button>`).join('');
- $('#scrub').setAttribute('max',String(total()));$('#end-label').textContent=`${total()} 秒`;['#restart','#play','#scrub'].forEach(s=>($(s) as HTMLButtonElement).disabled=!cards.length);
-}
-$('#library').addEventListener('click',e=>{const b=(e.target as HTMLElement).closest<HTMLElement>('[data-add]');if(b){const type=Number(b.dataset.add);cards.push({id:crypto.randomUUID(),type,duration:durations[type]});edit();}});
-$('#playlist').addEventListener('click',e=>{const b=(e.target as HTMLElement).closest<HTMLElement>('[data-action]');const card=b?.closest<HTMLElement>('[data-id]');if(!b||!card)return;const i=cards.findIndex(c=>c.id===card.dataset.id);const action=b.dataset.action;if(action==='preview'){const ss=segments.filter(s=>s.cardId===cards[i].id);time=ss[0].start;previewEnd=ss.at(-1)!.end;playing=true;return;}if(action==='delete')cards.splice(i,1);if(action==='up'&&i>0)[cards[i-1],cards[i]]=[cards[i],cards[i-1]];if(action==='down'&&i<cards.length-1)[cards[i+1],cards[i]]=[cards[i],cards[i+1]];edit();});
-$('#playlist').addEventListener('change',e=>{const input=e.target as HTMLInputElement;if(input.tagName!=='INPUT')return;const c=cards.find(c=>c.id===input.closest<HTMLElement>('[data-id]')!.dataset.id)!;c.duration=Math.max(c.type===5?5:1,Math.min(300,Number(input.value)||durations[c.type]));edit();});
-new Sortable($('#library'),{group:{name:'program',pull:'clone',put:false},sort:false,animation:150,delay:180,delayOnTouchOnly:true,filter:'button',onStart:()=>{playing=false;}});
-new Sortable($('#playlist'),{group:{name:'program',pull:false,put:true},handle:'.handle',animation:150,onStart:()=>{playing=false;},onAdd:event=>{const type=Number(event.item.dataset.type);event.item.remove();cards.splice(event.newIndex??cards.length,0,{id:crypto.randomUUID(),type,duration:durations[type]});edit();},onEnd:event=>{if(event.oldIndex!==undefined&&event.newIndex!==undefined&&event.oldIndex!==event.newIndex){cards.splice(event.newIndex,0,cards.splice(event.oldIndex,1)[0]);edit();}}});
-$('#energetic').onclick=()=>{cards=energetic();edit();};$('#reset').onclick=()=>{cards=template();edit();};$('#restart').onclick=()=>{time=0;previewEnd=null;playing=true;};$('#play').onclick=()=>{if(time>=total())time=0;previewEnd=null;playing=!playing;};$('#scrub').oninput=e=>{playing=false;previewEnd=null;time=Number((e.target as HTMLInputElement).value);};$('#speed').onchange=e=>speed=Number((e.target as HTMLSelectElement).value);
-$('#timeline').onclick=e=>{const b=(e.target as HTMLElement).closest<HTMLElement>('[data-time]');if(b){playing=false;previewEnd=null;time=Number(b.dataset.time);}};
+
+mountMarkup();
+bindControls();
 renderList();
-const viewport=$('#viewport'),scene=new THREE.Scene();const skyCanvas=document.createElement('canvas');skyCanvas.width=2;skyCanvas.height=256;const skyCtx=skyCanvas.getContext('2d')!;const gradient=skyCtx.createLinearGradient(0,0,0,256);gradient.addColorStop(0,'#8bcff7');gradient.addColorStop(1,'#f6fbff');skyCtx.fillStyle=gradient;skyCtx.fillRect(0,0,2,256);const skyTexture=new THREE.CanvasTexture(skyCanvas);skyTexture.colorSpace=THREE.SRGBColorSpace;scene.background=skyTexture;scene.fog=new THREE.Fog('#e7f5ff',30,70);
-const camera=new THREE.PerspectiveCamera(43,1,0.1,150);const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;viewport.prepend(renderer.domElement);
-renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1;
-const composer=new EffectComposer(renderer);composer.addPass(new RenderPass(scene,camera));
-const bloom=new UnrealBloomPass(new THREE.Vector2(1,1),0.55,0.4,2.1);composer.addPass(bloom);composer.addPass(new OutputPass());
-const qualityButton=document.createElement('button');qualityButton.id='glow';qualityButton.textContent='光暈：自動';qualityButton.title='自動模式在小螢幕及低核心裝置關閉後製光暈';document.querySelector('.views')!.append(qualityButton);
-let glowMode=0;qualityButton.onclick=()=>{glowMode=(glowMode+1)%3;qualityButton.textContent=['光暈：自動','光暈：開啟','光暈：關閉'][glowMode];};
-const controls=new OrbitControls(camera,renderer.domElement);controls.target.set(5,0,4);controls.maxPolarAngle=Math.PI/2-0.04;controls.minDistance=4;controls.maxDistance=34;controls.enableDamping=true;controls.touches.ONE=THREE.TOUCH.ROTATE;controls.touches.TWO=THREE.TOUCH.DOLLY_PAN;
-function view(i:number){const positions=[[5,12,17],[5,19,4.001],[-10,8,4],[20,8,4],[5,12,17],[5,3.3,18]];camera.position.set(...positions[i] as [number,number,number]);controls.target.set(5,0,4);controls.update();}view(0);document.querySelectorAll<HTMLElement>('[data-view]').forEach(b=>b.onclick=()=>view(Number(b.dataset.view)));
-scene.add(new THREE.HemisphereLight(0xd9efff,0x8cabb4,1.2));const light=new THREE.DirectionalLight(0xffeed5,1.8);light.position.set(2,14,9);light.castShadow=true;light.shadow.mapSize.set(2048,2048);light.shadow.camera.left=-12;light.shadow.camera.right=12;light.shadow.camera.top=12;light.shadow.camera.bottom=-12;scene.add(light);light.target.position.set(5,0,4);scene.add(light.target);
-const mat=(color:THREE.ColorRepresentation)=>new THREE.MeshStandardMaterial({color,roughness:0.8});
-function box(w:number,h:number,d:number,color:THREE.ColorRepresentation,x:number,y:number,z:number,parent:THREE.Object3D=scene){const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat(color));mesh.position.set(x,y,z);mesh.receiveShadow=true;mesh.castShadow=true;parent.add(mesh);return mesh;}
-box(13,0.4,10.5,0x8babc1,5,-0.3,4);box(10,0.12,8,0xeee6d4,5,-0.06,4);box(1.1,0.05,8,0xc3e8fc,-0.65,-0.03,4);box(1.1,0.05,8,0xffdfc2,10.65,-0.03,4);
-function label(text:string,color:string,x:number,y:number,z:number,scale=1){const canvas=document.createElement('canvas');canvas.width=512;canvas.height=128;const ctx=canvas.getContext('2d')!;ctx.font='bold 56px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=color;ctx.fillText(text,256,64);const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(canvas),depthTest:false}));sprite.position.set(x,y,z);sprite.scale.set(2*scale,0.5*scale,1);scene.add(sprite);return sprite;}
-label('觀眾席','#315473',5,0.15,9.2,1.3);label('鯉 魚 十 球 秀','#477681',5,0.15,-1,1.2);
-const trails:THREE.Mesh[][]=[];const leds:THREE.Mesh[]=[],ballLights:THREE.PointLight[]=[],halos:THREE.Mesh[]=[],matrices:THREE.Mesh[]=[];const finishRails:THREE.Mesh[]=[]; const ballLabels:THREE.Sprite[]=[]; const balls:THREE.Mesh[]=[],children:THREE.Group[]=[],arms:THREE.Group[]=[],laneHighlights:THREE.Mesh[]=[],stops:THREE.Mesh[]=[],finish:THREE.Mesh[]=[];
-for(let lane=0;lane<5;lane++){const z=7-lane*1.5;box(10,0.012,1.15,[0xe1efff,0xece5ff,0xffe4eb,0xe0f3e7,0xffefd8][lane],5,0.012,z);box(10,0.015,0.025,0xa3b4be,5,0.025,z+0.6);box(0.025,0.02,1.2,0x82929b,5,0.03,z);
- for(const left of [true,false])for(const d of [1,2,3.3,3.8]){box(0.045,0.018,0.35,0x82929b,left?d:10-d,0.035,z);}
-}
-for(const [j,d] of [1,2,3.3,3.8].entries())for(const left of [true,false])label(['外點','中點','急停','內點'][j],'#426078',left?d:10-d,0.1,8.1,0.38);
-for(const x of [1,9])finishRails.push(box(0.12,0.02,7.3,0xa9bbc7,x,0.035,4));
-for(let i=0;i<10;i++){const left=i<5,n=i%5,z=7-n*1.5,color=left?0x5abaff:0xffa55e,x=left?-0.65:10.65;
- const lane=box(4.1,0.012,1.1,color,left?2.1:7.9,0.025,z);(lane.material as THREE.MeshStandardMaterial).transparent=true;(lane.material as THREE.MeshStandardMaterial).opacity=0.18;lane.visible=false;laneHighlights.push(lane);
- const stop=new THREE.Mesh(new THREE.TorusGeometry(0.24,0.025,6,24),mat(color));stop.rotation.x=Math.PI/2;stop.position.y=0.04;stop.visible=false;scene.add(stop);stops.push(stop);
- const end=box(0.14,0.03,1.1,color,left?1:9,0.04,z);finish.push(end);
- const ball=new THREE.Mesh(new THREE.SphereGeometry(0.15,24,18),new THREE.MeshPhysicalMaterial({color:0xffffff,transmission:0.9,roughness:0.15,thickness:0.05,ior:1.45,clearcoat:1}));ball.position.set(left?1:9,0.19,z);ball.userData.index=i;scene.add(ball);balls.push(ball);
- const tail=Array.from({length:5},(_,k)=>{const mesh=new THREE.Mesh(new THREE.SphereGeometry(0.07*(1-k*0.12),8,6),new THREE.MeshBasicMaterial({color,transparent:true,opacity:0.4-k*0.06,depthWrite:false}));mesh.visible=false;scene.add(mesh);return mesh;});trails.push(tail);
- const led=new THREE.Mesh(new THREE.SphereGeometry(0.085,12,10),new THREE.MeshStandardMaterial({color,emissive:color,emissiveIntensity:3,roughness:0.3}));ball.add(led);leds.push(led);
- box(0.18,0.025,0.12,0x265a4c,0,-0.06,0,ball);
- for(const wx of [-0.085,0.085]){const wheel=new THREE.Mesh(new THREE.CylinderGeometry(0.045,0.045,0.03,10),mat(0x233b46));wheel.rotation.z=Math.PI/2;wheel.position.set(wx,-0.055,0);ball.add(wheel);}
- const pixelCanvas=document.createElement('canvas');pixelCanvas.width=8;pixelCanvas.height=8;const pixelCtx=pixelCanvas.getContext('2d')!;pixelCtx.fillStyle='#102d3b';pixelCtx.fillRect(0,0,8,8);pixelCtx.font='8px monospace';pixelCtx.fillStyle='#ffffff';pixelCtx.fillText(String(n+1),1,7);const pixelTexture=new THREE.CanvasTexture(pixelCanvas);pixelTexture.magFilter=THREE.NearestFilter;
- const matrix=new THREE.Mesh(new THREE.PlaneGeometry(0.1,0.1),new THREE.MeshBasicMaterial({map:pixelTexture,side:THREE.DoubleSide}));matrix.rotation.x=-Math.PI/2;matrix.position.y=0.105;ball.add(matrix);matrices.push(matrix);
- const halo=new THREE.Mesh(new THREE.RingGeometry(0.19,0.23,32),new THREE.MeshBasicMaterial({color,transparent:true,opacity:0.7,side:THREE.DoubleSide,depthWrite:false}));halo.rotation.x=-Math.PI/2;halo.position.y=-0.15;ball.add(halo);halos.push(halo);
- const point=new THREE.PointLight(color,0.5,1.1,2);point.position.y=0.12;ball.add(point);ballLights.push(point);
- ballLabels.push(label(`${left?'L':'R'}${n+1}`,left?'#135e9a':'#985016',ball.position.x,0.65,z,0.4));label(`${left?'L':'R'}${n+1}`,left?'#135e9a':'#985016',x,2,z,0.55);
- const child=new THREE.Group();child.position.set(x,0,z);scene.add(child);children.push(child);box(0.42,0.58,0.3,color,0,0.94,0,child);box(0.14,0.5,0.17,0x1a283a,-0.13,0.4,0,child);box(0.14,0.5,0.17,0x1a283a,0.13,0.4,0,child);
- const head=new THREE.Mesh(new THREE.IcosahedronGeometry(0.24,1),mat(0xf2c29c));head.position.y=1.48;child.add(head);box(0.4,0.12,0.34,0x263346,0,1.67,0,child);
- const arm=new THREE.Group();arm.position.set(left?0.28:-0.28,1.15,0);child.add(arm);box(0.12,0.4,0.13,0xf2c29c,0,-0.15,0,arm);arms.push(arm);box(0.27,0.23,0.055,0x162d46,left?0.27:-0.27,0.9,0.2,child);
-}
-for(const [x,z] of [[-1,8.5],[11,8.5],[-1,-0.7],[11,-0.7]]){box(0.6,0.45,0.6,0x946444,x,0.1,z);const tree=new THREE.Mesh(new THREE.ConeGeometry(0.6,1.5,5),mat(0x428c73));tree.position.set(x,1.0,z);tree.castShadow=true;scene.add(tree);}
-const ray=new THREE.Raycaster(),pointer=new THREE.Vector2();let down=[0,0];renderer.domElement.addEventListener('pointerdown',e=>{down=[e.clientX,e.clientY];});renderer.domElement.addEventListener('pointerup',e=>{if(Math.hypot(e.clientX-down[0],e.clientY-down[1])>6)return;const r=renderer.domElement.getBoundingClientRect();pointer.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);ray.setFromCamera(pointer,camera);const hit=ray.intersectObjects(balls)[0];selected=hit?Number(hit.object.userData.index):-1;});
-new ResizeObserver(()=>{const w=viewport.clientWidth,h=viewport.clientHeight;renderer.setSize(w,h,false);composer.setSize(w,h);camera.aspect=w/Math.max(h,1);camera.updateProjectionMatrix();}).observe(viewport);
-let last=performance.now();
-function frame(now:number){const dt=(now-last)/1000;last=now;if(playing){time=Math.min(time+dt*speed,previewEnd??total());if(time>=(previewEnd??total()))playing=false;}const state=sample(segments,previewEnd!==null&&time===previewEnd?Math.max(0,time-0.000001):time);const ready=time===0&&!playing;$('#subtitle').textContent=ready?'選好節目，準備一起出發！':state.subtitle;$('#countdown').textContent=state.countdown;$('#phase').textContent=ready?'準備上場':state.segment?`${state.segment.transition?'換位準備':'正在排練'} · ${names[state.segment.type]}`:'準備上場';$('#play').textContent=playing?'暫停':'播放';$('#clock').textContent=`${time.toFixed(1)} / ${total().toFixed(1)} 秒`;($<HTMLInputElement>('#scrub')).value=String(time);
- const previous=sample(segments,Math.max(0,time-0.04));const trailStates=state.segment?.type===6&&!state.segment.transition?Array.from({length:5},(_,k)=>sample(segments,Math.max(state.segment!.start,time-(k+1)*0.07))):[];
- document.querySelectorAll<HTMLElement>('.show-card').forEach(c=>c.classList.toggle('active',c.dataset.id===state.segment?.cardId));
- balls.forEach((b,i)=>{const d=state.positions[i];b.position.x=i<5?d:10-d;ballLabels[i].position.x=b.position.x;const chosen=selected===i;b.scale.setScalar(chosen?1.45:1);const ledMaterial=leds[i].material as THREE.MeshStandardMaterial;ledMaterial.color.set(state.colors[i]);ledMaterial.emissive.set(state.colors[i]);ledMaterial.emissiveIntensity=state.brightness[i]*3;ballLights[i].color.set(state.colors[i]);ballLights[i].intensity=state.brightness[i]*0.7;(halos[i].material as THREE.MeshBasicMaterial).opacity=chosen?1:0.55;laneHighlights[i].visible=chosen;stops[i].visible=chosen;const end=state.targets[i];stops[i].position.set(i<5?end:10-end,0.04,b.position.z);const arrived=state.finishLit[i]>0;const endMaterial=finish[i].material as THREE.MeshStandardMaterial;endMaterial.color.set(arrived?'#ffd23c':i<5?'#329dd6':'#e69346');endMaterial.emissive.set(arrived?'#ffce25':'#000000');endMaterial.emissiveIntensity=arrived?2:0;
 
- trails[i].forEach((mesh,k)=>{mesh.visible=trailStates.length>0&&state.local<(i%5%2===0?1.5:2.5)&&state.local>(i%5%2===0?0:1);if(mesh.visible){const d=trailStates[k].positions[i];mesh.position.set(i<5?d:10-d,0.12,b.position.z);(mesh.material as THREE.MeshBasicMaterial).color.set(state.colors[i]);}});
- const movingNow=!state.segment?.transition&&Math.abs(state.positions[i]-previous.positions[i])>0.001;children[i].position.x=(i<5?-0.65:10.65)+(movingNow?(i<5?0.12:-0.12):0);
- const bow=state.segment?.type===7&&!state.segment.transition;children[i].rotation.z=bow&&state.local>=2&&state.local<5?(i<5?-0.28:0.28):0;arms[i].rotation.z=bow&&state.local<2?Math.sin(state.local*10)*0.5+2:movingNow?(i<5?-1.8:1.8):0;
- });
- if(selected>=0){const i=selected,s=state.segment;const moving=s?Array.from({length:10},(_,j)=>j).filter(j=>Math.abs(s.from[j]-s.to[j])>0.001):[];let order='本段維持停位';if(s?.type===2)order=i<5?'左隊先行':'右隊跟上';else if(s?.type===6)order=i%5%2===0?'第一波出發':'第二波出發';else if(s?.type===3)order=i%5%2===0?'單數移動':'雙數定格';else if(moving.includes(i))order=s?.type===1?`第 ${i%5} 批接力`:'同步出發';$('#selection').textContent=`${i<5?'L':'R'}${i%5+1} · ${order} · 位置 ${state.positions[i].toFixed(2)} m · 停點 ${state.targets[i].toFixed(1)} m`;}else $('#selection').textContent='點選一顆球，查看走位';
- const allArrived=state.finishLit.every(v=>v>0);finishRails.forEach(line=>{const material=line.material as THREE.MeshStandardMaterial;material.color.set(allArrived?'#ffd23c':'#a9bbc7');material.emissive.set(allArrived?'#ffcf30':'#000000');material.emissiveIntensity=allArrived?2:0;});
- controls.update();const useBloom=glowMode===1||(glowMode===0&&innerWidth>1000&&(navigator.hardwareConcurrency||4)>4);if(useBloom)composer.render();else renderer.render(scene,camera);requestAnimationFrame(frame);
-}requestAnimationFrame(frame);
+const viewport = $('#viewport');
+const { scene, camera, renderer, composer, controls } = createRenderer(viewport);
+const world = buildWorld(scene);
+setView(camera, controls, 0);
+document
+  .querySelectorAll<HTMLElement>('[data-view]')
+  .forEach((b) => (b.onclick = () => setView(camera, controls, Number(b.dataset.view))));
 
+// 光暈：自動／開啟／關閉
+let glowMode = 0;
+const glowButton = $('#glow');
+glowButton.onclick = () => {
+  glowMode = (glowMode + 1) % 3;
+  glowButton.lastChild!.textContent = ['光暈：自動', '光暈：開啟', '光暈：關閉'][glowMode];
+};
+
+const spheros = Array.from({ length: 10 }, (_, i) => createSphero(scene, i));
+const kids = Array.from({ length: 10 }, (_, i) => createKid(scene, i, i < 5 ? -0.65 : 10.65, laneZ(i % 5)));
+spheros.forEach((s, i) => (s.root.position.z = laneZ(i % 5)));
+
+// 衝線尾光：以歷史秒點重建，不累積殘影
+const trailTex = radialTexture();
+const trails = spheros.map(() =>
+  Array.from({ length: 6 }, (_, k) => {
+    const m = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.34 * (1 - k * 0.12), 0.34 * (1 - k * 0.12)),
+      new THREE.MeshBasicMaterial({
+        map: trailTex,
+        transparent: true,
+        opacity: 0.75 - k * 0.11,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      }),
+    );
+    m.rotation.x = -Math.PI / 2;
+    m.position.y = 0.2;
+    m.visible = false;
+    scene.add(m);
+    return m;
+  }),
+);
+
+// 點選球
+const ray = new THREE.Raycaster(),
+  pointer = new THREE.Vector2();
+let down = [0, 0];
+renderer.domElement.addEventListener('pointerdown', (e) => (down = [e.clientX, e.clientY]));
+renderer.domElement.addEventListener('pointerup', (e) => {
+  if (Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 6) return;
+  const r = renderer.domElement.getBoundingClientRect();
+  pointer.set(((e.clientX - r.left) / r.width) * 2 - 1, (-(e.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(pointer, camera);
+  const hit = ray.intersectObjects(spheros.map((s) => s.shell))[0];
+  show.selected = hit ? Number(hit.object.userData.index) : -1;
+});
+
+new ResizeObserver(() => {
+  const w = viewport.clientWidth,
+    h = viewport.clientHeight;
+  renderer.setSize(w, h, false);
+  composer.setSize(w, h);
+  camera.aspect = w / Math.max(h, 1);
+  camera.updateProjectionMatrix();
+}).observe(viewport);
+
+const GOLD = '#ffd23c';
+let last = performance.now();
+function frame(now: number) {
+  const dt = Math.min(0.1, (now - last) / 1000);
+  last = now;
+  const secs = now / 1000;
+  if (show.playing) {
+    const end = show.previewEnd ?? total();
+    show.time = Math.min(show.time + dt * show.speed, end);
+    if (show.time >= end) show.playing = false;
+  }
+  const { segments, time, previewEnd } = show;
+  const state = sample(
+    segments,
+    previewEnd !== null && time === previewEnd ? Math.max(0, time - 0.000001) : time,
+  );
+  const previous = sample(segments, Math.max(0, time - 0.04));
+  updateHud(state);
+
+  const seg = state.segment;
+  const dash = seg?.type === 6 && !seg.transition;
+  const trailStates = dash
+    ? Array.from({ length: 6 }, (_, k) => sample(segments, Math.max(seg!.start, time - (k + 1) * 0.06)))
+    : [];
+  const bowing = seg?.type === 7 && !seg.transition;
+
+  spheros.forEach((s, i) => {
+    const d = state.positions[i];
+    const x = i < 5 ? d : 10 - d;
+    s.root.position.x = x;
+    s.update(state.colors[i], state.brightness[i], show.selected === i, secs);
+
+    const arrived = state.finishLit[i] > 0;
+    const end = world.finish[i].material as THREE.MeshStandardMaterial;
+    end.color.set(arrived ? GOLD : i < 5 ? '#2f8fe0' : '#f08a2c');
+    end.emissive.set(arrived ? '#ffc21a' : '#000000');
+    end.emissiveIntensity = arrived ? 2.6 : 0;
+
+    const odd = (i % 5) % 2 === 0;
+    trails[i].forEach((m, k) => {
+      m.visible = dash && state.local < (odd ? 1.5 : 2.5) && state.local > (odd ? 0 : 1);
+      if (!m.visible) return;
+      const td = trailStates[k].positions[i];
+      m.position.set(i < 5 ? td : 10 - td, 0.2, laneZ(i % 5));
+      (m.material as THREE.MeshBasicMaterial).color.set(state.colors[i]);
+    });
+
+    const movingNow = !seg?.transition && Math.abs(state.positions[i] - previous.positions[i]) > 0.001;
+    const t = state.local;
+    kids[i].pose(bowing ? (t < 2 ? 'wave' : t < 5 ? 'bow' : 'idle') : movingNow ? 'go' : 'idle', t);
+  });
+
+  const allArrived = state.finishLit.every((v) => v > 0);
+  world.finishRails.forEach((line) => {
+    const m = line.material as THREE.MeshStandardMaterial;
+    m.color.set(allArrived ? GOLD : '#c9d3da');
+    m.emissive.set(allArrived ? '#ffc21a' : '#000000');
+    m.emissiveIntensity = allArrived ? 2.4 : 0;
+  });
+
+  // 觀眾：十球到站與謝幕時歡呼（由時間軸決定，回拉結果一致）
+  const cheer = allArrived || (dash && state.local > 2.5);
+  world.audience.forEach((p) => {
+    const lift = cheer ? 2.6 + Math.sin(time * 7 + p.phase) * 0.25 : 0.25;
+    p.arms[0].rotation.z = -lift;
+    p.arms[1].rotation.z = lift;
+    p.body.position.y = 0.21 + (cheer ? Math.max(0, Math.sin(time * 7 + p.phase)) * 0.06 : 0);
+  });
+  // 環境動態（與表演無關）：海浪與彩旗
+  world.seaTime.value = secs;
+  world.flags.forEach((f) => (f.rotation.z = f.userData.rz + Math.sin(secs * 2 + f.userData.phase) * 0.12));
+
+  controls.update();
+  const useBloom =
+    glowMode === 1 || (glowMode === 0 && innerWidth > 1000 && (navigator.hardwareConcurrency || 4) > 4);
+  if (useBloom) composer.render();
+  else renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
