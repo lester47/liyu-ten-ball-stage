@@ -58,7 +58,7 @@ function rng(seed: number) {
 
 export function createRenderer(viewport: HTMLElement) {
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 900);
+  const camera = new THREE.PerspectiveCamera(42, 1, 0.5, 900);
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
@@ -179,7 +179,8 @@ function addIsland(scene: THREE.Scene) {
     return geo;
   };
   const sand = new THREE.Mesh(jitter(new THREE.CylinderGeometry(27, 30, 1.6, 22), 0.05), mat('#ecd9a8'));
-  sand.position.set(5, -1.05, 4);
+  // 沙灘頂面要明顯低於草地頂面（-0.25），兩個面重疊會互相搶深度而閃爍
+  sand.position.set(5, -1.35, 4);
   sand.receiveShadow = true;
   scene.add(sand);
   const grass = new THREE.Mesh(jitter(new THREE.CylinderGeometry(24, 25.5, 0.5, 22), 0.05), mat('#8cc66a'));
@@ -195,7 +196,8 @@ function addIsland(scene: THREE.Scene) {
       mat(r() > 0.5 ? '#7fbb5d' : '#9fd178'),
     );
     patch.rotation.x = -Math.PI / 2;
-    patch.position.set(5 + Math.cos(a) * d, -0.24, 4 + Math.sin(a) * d);
+    // 每塊色塊高度錯開，重疊時不會搶深度
+    patch.position.set(5 + Math.cos(a) * d, -0.23 + i * 0.004, 4 + Math.sin(a) * d);
     patch.receiveShadow = true;
     scene.add(patch);
   }
@@ -364,7 +366,7 @@ function addStage(scene: THREE.Scene) {
   });
 
   const audienceText = groundText('觀 眾 席', '#2f6a2f', 4, 0.8);
-  audienceText.position.set(5, -0.23, 11.3);
+  audienceText.position.set(5, -0.12, 11.3);
   scene.add(audienceText);
   return { finish, finishRails };
 }
