@@ -40,18 +40,37 @@ const TURN = Math.PI * 0.6; // 繞圈圈：一起轉約三分之一圈
 const ringAt = (i: number, f: number, r = RING_R): Pt => polar(angOf(RING_A[i]) + TURN * f, r);
 const RING_END = ids.map((i) => ringAt(i, 1));
 const HUDDLE = ids.map((i) => ringAt(i, 1, 1.6));
-/** 魚形膠帶點（魚頭朝右）：點與點至少相距 1.2 m。 */
+/**
+ * 地上的平面大鯉魚（魚頭朝右）：身體是橢圓，尾巴是兩片尾鰭。
+ * 老師把它平鋪在舞台中間，球就排在魚的邊緣上。
+ */
+export const KOI_SHAPE = {
+  cx: 5.6,
+  cz: 4,
+  rx: 3.0,
+  rz: 1.9,
+  /** 尾鰭兩個尖端與中間凹口 */
+  tailTipX: 1.2,
+  tailTipZ: 2.3,
+  notchX: 2.1,
+};
+const K = KOI_SHAPE;
+const onBody = (deg: number, side: 1 | -1): Pt => ({
+  x: K.cx + Math.cos((deg * Math.PI) / 180) * K.rx,
+  z: K.cz + side * Math.sin((deg * Math.PI) / 180) * K.rz,
+});
+/** 魚形 ✕ 點：全部在魚的輪廓上，點與點至少相距 1.8 m。 */
 export const FISH_MARKS: Pt[] = [
-  { x: 8.1, z: 4 },
-  { x: 6.9, z: 2.3 },
-  { x: 5.2, z: 1.8 },
-  { x: 3.6, z: 2.3 },
-  { x: 2.0, z: 1.6 },
-  { x: 2.7, z: 4 },
-  { x: 2.0, z: 6.4 },
-  { x: 3.6, z: 5.7 },
-  { x: 5.2, z: 6.2 },
-  { x: 6.9, z: 5.7 },
+  onBody(0, 1),
+  onBody(50, -1),
+  onBody(95, -1),
+  onBody(140, -1),
+  { x: K.tailTipX, z: K.cz - K.tailTipZ },
+  { x: K.notchX, z: K.cz },
+  { x: K.tailTipX, z: K.cz + K.tailTipZ },
+  onBody(140, 1),
+  onBody(95, 1),
+  onBody(50, 1),
 ];
 const FISH = matchByAngle(HUDDLE, FISH_MARKS);
 export const LINE_Z = 6.9;
@@ -163,15 +182,15 @@ export const koiCards: FreeCard[] = [
     show: 'koi',
     name: '排魚造型',
     duration: 8,
-    summary: '老師放上鯉魚道具，大家開到魚形的點上',
-    tip: { kid: '開到魚形膠帶的 ✕ 點上', ok: '點和點之間很寬，大概在附近就看得出是一條魚' },
+    summary: '老師在地上鋪一條大鯉魚，大家開到魚的邊緣圍著它',
+    tip: { kid: '開到大鯉魚邊緣的 ✕ 點上，貼著魚身停好', ok: '沒貼準也沒關係，圍在魚旁邊就看得出是一條魚' },
     from: HUDDLE,
     to: FISH,
-    move: [0.6, 4.6],
+    move: [0.8, 4.6],
     lights: (t) => lights((i, c) => (c[i] = t > 6 ? GOLD : t > 4.6 ? '#ff7a3d' : RAINBOW[i])),
     subtitle: (t) => (t < 4.6 ? '鯉魚來了！排魚造型' : '是一條大鯉魚！'),
     marks: [{ k: 'x', pts: FISH_MARKS, color: '#ff7a3d' }],
-    koi: (t) => clamp01((t - 1.6) / 0.8),
+    koi: (t) => clamp01(t / 0.6),
   },
   {
     show: 'koi',
