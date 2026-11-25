@@ -3,14 +3,21 @@
  * 鯉魚秀的 9 張卡維持 13–21，舊的存檔照樣能讀。
  */
 import { ease, lanePts, lerpPt, type FreeCard, type Mark, type Pt, type ShowId } from './shows/kit';
-import { koiCards } from './shows/koi';
+import { koiCards, koiExtraCards } from './shows/koi';
 import { fireworkCards, gardenCards, trainCards } from './shows/more';
 
 export type { FreeCard, Mark, Pt, ShowId };
 export { lanePts, lerpPt };
 
 export const FREE_FIRST = 13;
-export const FREE_CARDS: FreeCard[] = [...koiCards, ...gardenCards, ...trainCards, ...fireworkCards];
+// 新卡片一律接在最後，舊存檔裡的卡片編號才不會錯位
+export const FREE_CARDS: FreeCard[] = [
+  ...koiCards,
+  ...gardenCards,
+  ...trainCards,
+  ...fireworkCards,
+  ...koiExtraCards,
+];
 export const FREE_TYPES = FREE_CARDS.map((_, k) => FREE_FIRST + k);
 export const isFree = (type: number) => type >= FREE_FIRST;
 export const freeCard = (type: number) => FREE_CARDS[type - FREE_FIRST];
@@ -56,9 +63,8 @@ export const showOf = (type: number) => (isFree(type) ? freeCard(type).show : un
 
 /** 某套節目的卡片清單（預設秒數）。 */
 export const showCards = (id: ShowId) =>
-  FREE_TYPES.filter((type) => freeCard(type).show === id).map((type) => ({
-    id: crypto.randomUUID(),
-    type,
-    duration: freeCard(type).duration,
-  }));
+  FREE_TYPES.filter((type) => freeCard(type).show === id)
+    .map((type, k) => ({ type, key: freeCard(type).pos ?? k }))
+    .sort((a, b) => a.key - b.key)
+    .map(({ type }) => ({ id: crypto.randomUUID(), type, duration: freeCard(type).duration }));
 export const standardShow = () => showCards('koi');

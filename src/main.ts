@@ -7,6 +7,7 @@ import { createSphero } from './stage/sphero';
 import { createKid } from './stage/kid';
 import { radialTexture } from './stage/labels';
 import { createFreeMarks } from './stage/freeMarks';
+import { createDancers } from './stage/dancers';
 import { isBow, isFree, koiProp } from './freeShow';
 import './style.css';
 
@@ -18,6 +19,7 @@ const viewport = $('#viewport');
 const { scene, camera, renderer, composer, controls } = createRenderer(viewport);
 const world = buildWorld(scene);
 const marks = createFreeMarks(scene);
+const dancers = createDancers(scene);
 setView(camera, controls, 0);
 document
   .querySelectorAll<HTMLElement>('[data-view]')
@@ -157,9 +159,9 @@ function frame(now: number) {
     p.arms[1].rotation.z = lift;
     p.body.position.y = 0.21 + (cheer ? Math.max(0, Math.sin(time * 7 + p.phase)) * 0.06 : 0);
   });
-  // 環境動態（與表演無關）：海浪與彩旗
+  // 海浪（與表演無關）；伴舞學生跟著節目時間跳
   world.seaTime.value = secs;
-  world.flags.forEach((f) => (f.rotation.z = f.userData.rz + Math.sin(secs * 2 + f.userData.phase) * 0.12));
+  dancers.update(time);
 
   controls.update();
   const useBloom =
