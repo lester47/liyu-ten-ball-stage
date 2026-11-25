@@ -41,6 +41,8 @@ export type FreeCard = {
   koi?: (t: number) => number;
   /** 謝幕：孩子揮手鞠躬、觀眾歡呼。 */
   bow?: boolean;
+  /** 在節目裡的順序（預設照加入順序）；後來插入的段落用小數排進中間。 */
+  pos?: number;
 };
 
 export const C: Pt = { x: 5, z: 4 };

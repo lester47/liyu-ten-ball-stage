@@ -57,6 +57,9 @@ const TURN = Math.PI * 0.6; // 繞著鯉魚游：一起轉約三分之一圈
 const ringAt = (i: number, f: number, r = KOI_RING_R): Pt => polar(angOf(RING_A[i], K) + TURN * f, r, K);
 const RING_END = ids.map((i) => ringAt(i, 1));
 const NEAR = ids.map((i) => ringAt(i, 0, KOI_RING_R - 0.4));
+/** 集合點：十顆球擠到鯉魚肚子上，圍成一小團（半徑 1.25 m）。 */
+export const GATHER_R = 1.25;
+const GATHER = ids.map((i) => ringAt(i, 1, GATHER_R));
 const FISH = matchByAngle(RING_END, FISH_MARKS, K);
 /** 呼吸：從魚邊往外 0.35 m。 */
 const BREATH = FISH.map((p) => {
@@ -75,26 +78,26 @@ export const koiCards: FreeCard[] = [
   {
     show: 'koi',
     name: '燈亮出發',
-    duration: 6,
+    duration: 5,
     summary: '燈一顆接一顆亮起，往大鯉魚的方向開一小段',
     tip: { kid: '燈亮了，把球往大鯉魚的方向開一小段', ok: '開多開少都可以，像小魚好奇地游出來' },
     from: HOME,
     to: FORWARD,
-    move: [1.6, 4],
+    move: [1.2, 3.6],
     lights: (t) => lights((i, _c, b) => (b[i] = clamp01((t - 0.15 * i) / 0.3))),
-    subtitle: (t) => (t < 1.6 ? '大鯉魚在舞台中間！' : '小魚游出來囉'),
+    subtitle: (t) => (t < 1.2 ? '大鯉魚在舞台中間！' : '小魚游出來囉'),
     marks: [{ k: 'tick', pts: FORWARD }],
     koi: koiAlways,
   },
   {
     show: 'koi',
     name: '游到鯉魚身邊',
-    duration: 7,
+    duration: 6,
     summary: '開到鯉魚外圍的大圓圈上，把鯉魚圍起來',
     tip: { kid: '開到鯉魚外面那一圈膠帶附近', ok: '圈圈歪歪的也很好看，像一群小魚圍著大魚' },
     from: FORWARD,
     to: RING_A,
-    move: [0.3, 5.8],
+    move: [0.2, 5.6],
     lights: rainbow,
     subtitle: () => '游到鯉魚身邊',
     marks: [ringMark],
@@ -103,33 +106,33 @@ export const koiCards: FreeCard[] = [
   {
     show: 'koi',
     name: '跟鯉魚打招呼',
-    duration: 6,
+    duration: 5,
     summary: '往鯉魚靠近一小步，閃燈說哈囉，再退回圓圈',
     tip: { kid: '往鯉魚開一小步，閃燈說哈囉，再退回來', ok: '沒退回原位也沒關係，鯉魚都看到你了' },
     from: RING_A,
     to: RING_A,
-    motion: (t) => lerpAll(RING_A, NEAR, ease((t - 0.3) / 2) - ease((t - 3.4) / 2.2)),
-    target: (t) => (t < 3 ? NEAR : RING_A),
+    motion: (t) => lerpAll(RING_A, NEAR, ease((t - 0.2) / 1.8) - ease((t - 2.9) / 1.9)),
+    target: (t) => (t < 2.6 ? NEAR : RING_A),
     lights: (t) =>
       lights(
         (i, c, b) => (
-          (c[i] = t > 2 && t < 3.6 ? GOLD : RAINBOW[i]),
-          (b[i] = t > 2 && t < 3.6 ? 0.5 + 0.5 * Math.abs(Math.sin(t * 8)) : 1)
+          (c[i] = t > 1.8 && t < 3.1 ? GOLD : RAINBOW[i]),
+          (b[i] = t > 1.8 && t < 3.1 ? 0.5 + 0.5 * Math.abs(Math.sin(t * 8)) : 1)
         ),
       ),
-    subtitle: (t) => (t < 3.4 ? '鯉魚你好！' : '退回圓圈'),
+    subtitle: (t) => (t < 2.9 ? '鯉魚你好！' : '退回圓圈'),
     marks: [ringMark],
     koi: koiAlways,
   },
   {
     show: 'koi',
     name: '繞著鯉魚游',
-    duration: 9,
+    duration: 8,
     summary: '大家朝同一個方向，繞著鯉魚慢慢游',
     tip: { kid: '大家朝同一個方向，繞著鯉魚慢慢開', ok: '快一點慢一點都沒關係，像小魚在池塘裡轉圈' },
     from: RING_A,
     to: RING_END,
-    motion: (t) => ids.map((i) => ringAt(i, ease((t - 0.3) / 8.2))),
+    motion: (t) => ids.map((i) => ringAt(i, ease((t - 0.2) / 7.4))),
     lights: (t) => lights((i, c) => (c[i] = RAINBOW[(i + Math.floor(t * 2)) % 10])),
     subtitle: () => '繞著鯉魚游～',
     marks: [ringMark],
@@ -138,7 +141,7 @@ export const koiCards: FreeCard[] = [
   {
     show: 'koi',
     name: '鯉魚吐泡泡',
-    duration: 6,
+    duration: 4,
     summary: '不用移動，燈一顆接一顆閃白、閃藍，像鯉魚吐泡泡',
     tip: { kid: '輪到你時把燈換成白色或藍色，像一顆泡泡', ok: '閃早閃晚都可以，泡泡本來就亂亂冒' },
     from: RING_END,
@@ -156,32 +159,32 @@ export const koiCards: FreeCard[] = [
   {
     show: 'koi',
     name: '貼著鯉魚排魚形',
-    duration: 8,
+    duration: 7,
     summary: '開到鯉魚邊上的 ✕ 點，貼著魚身、背鰭和尾巴排出魚形',
     tip: { kid: '開到鯉魚邊上的 ✕ 點，貼著魚身停好', ok: '沒貼準也沒關係，圍在魚旁邊就看得出是一條魚' },
     from: RING_END,
     to: FISH,
-    move: [0.4, 5.6],
-    lights: (t) => lights((i, c) => (c[i] = t > 6.6 ? GOLD : t > 5.6 ? '#ff7a3d' : RAINBOW[i])),
-    subtitle: (t) => (t < 6 ? '貼著鯉魚排出魚形' : '變成一條發光的大鯉魚！'),
+    move: [0.3, 5.2],
+    lights: (t) => lights((i, c) => (c[i] = t > 6 ? GOLD : t > 5.2 ? '#ff7a3d' : RAINBOW[i])),
+    subtitle: (t) => (t < 5.5 ? '貼著鯉魚排出魚形' : '變成一條發光的大鯉魚！'),
     marks: [fishMark],
     koi: koiAlways,
   },
   {
     show: 'koi',
     name: '跟鯉魚一起呼吸',
-    duration: 7,
+    duration: 5,
     summary: '往外一小步、再回到魚邊，做兩次，像鯉魚在呼吸',
     tip: { kid: '往外開一小步，再回到魚邊，做兩次', ok: '一次也很棒，鯉魚的呼吸本來就有大有小' },
     from: FISH,
     to: FISH,
     motion: (t) => {
-      const f = (s: number) => ease((t - s) / 1.4) - ease((t - s - 1.6) / 1.4);
-      return lerpAll(FISH, BREATH, f(0.3) + f(3.6));
+      const f = (s: number) => ease((t - s) / 1.1) - ease((t - s - 1.2) / 1.1);
+      return lerpAll(FISH, BREATH, f(0.2) + f(2.6));
     },
-    target: (t) => ((t > 0.3 && t < 1.9) || (t > 3.6 && t < 5.2) ? BREATH : FISH),
+    target: (t) => ((t > 0.2 && t < 1.4) || (t > 2.6 && t < 3.8) ? BREATH : FISH),
     lights: (t) => lights((i, c, b) => ((c[i] = GOLD), (b[i] = 0.55 + 0.45 * Math.abs(Math.sin(t * 1.9))))),
-    subtitle: (t) => (Math.floor(t / 1.65) % 2 ? '吐氣～' : '吸氣～'),
+    subtitle: (t) => (Math.floor((t - 0.2) / 1.2) % 2 ? '吐氣～' : '吸氣～'),
     marks: [fishMark],
     koi: koiAlways,
   },
@@ -212,5 +215,38 @@ export const koiCards: FreeCard[] = [
     marks: [{ k: 'line', z: LINE_Z }],
     koi: koiAlways,
     bow: true,
+  },
+];
+
+/** 後來加入的段落：編號接在所有節目之後，避免舊存檔的卡片編號錯位；pos 決定在鯉魚秀裡的順序。 */
+export const koiExtraCards: FreeCard[] = [
+  {
+    show: 'koi',
+    name: '到中間集合',
+    duration: 9,
+    summary: '大家擠到鯉魚肚子上集合，再散回圓圈，進出兩次',
+    tip: {
+      kid: '往鯉魚肚子中間開，擠在一起，再退回圓圈，做兩次',
+      ok: '擠歪了、退不回原位都沒關係，像小魚一下聚、一下散',
+    },
+    from: RING_END,
+    to: RING_END,
+    // 進 → 停一下 → 出 → 停一下 → 進 → 停一下 → 出
+    motion: (t) => {
+      const go = (s: number) => ease((t - s) / 1.9) - ease((t - s - 2.2) / 1.9);
+      return lerpAll(RING_END, GATHER, go(0.2) + go(4.6));
+    },
+    target: (t) => ((t > 0.2 && t < 2.4) || (t > 4.6 && t < 6.8) ? GATHER : RING_END),
+    lights: (t) => {
+      const inside = (t > 1.9 && t < 2.6) || (t > 6.3 && t < 7);
+      return lights((i, c, b) => {
+        c[i] = inside ? GOLD : RAINBOW[(i + Math.floor(t * 3)) % 10];
+        b[i] = inside ? 0.5 + 0.5 * Math.abs(Math.sin(t * 10)) : 1;
+      });
+    },
+    subtitle: (t) => (t < 2.4 || (t > 4.6 && t < 6.8) ? '到中間集合！' : '散開～'),
+    marks: [ringMark, { k: 'ring', rx: GATHER_R, n: 18, cx: K.x, cz: K.z }],
+    koi: koiAlways,
+    pos: 4.5,
   },
 ];

@@ -4,7 +4,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { LANE_COLORS, rainbow, TEAM } from './palette';
+import { LANE_COLORS, TEAM } from './palette';
 import { groundText, pillLabel } from './labels';
 
 /*
@@ -374,177 +374,6 @@ function addStage(scene: THREE.Scene) {
   return { finish, finishRails, lanes };
 }
 
-/** 舞台後方大背板：彩虹拱門＋「鯉魚十球秀」招牌＋鯉魚。 */
-function addBackdrop(scene: THREE.Scene) {
-  const g = new THREE.Group();
-  g.position.set(5, 0, -1.9);
-  scene.add(g);
-  for (const x of [-6.2, 6.2]) {
-    box(g, [0.35, 4.2, 0.35], '#d9ae78', [x, 1.9, 0]);
-    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.32, 10, 8), mat('#e3a33b'));
-    cap.position.set(x, 4.15, 0);
-    g.add(cap);
-  }
-  // 招牌
-  const c = document.createElement('canvas');
-  c.width = 2048;
-  c.height = 400;
-  const ctx = c.getContext('2d')!;
-  const grad = ctx.createLinearGradient(0, 0, 2048, 0);
-  rainbow.forEach((col, i) => grad.addColorStop(i / (rainbow.length - 1), col));
-  ctx.fillStyle = '#ffffff';
-  ctx.beginPath();
-  ctx.roundRect(0, 0, 2048, 400, 120);
-  ctx.fill();
-  ctx.fillStyle = grad;
-  ctx.beginPath();
-  ctx.roundRect(18, 18, 2012, 364, 104);
-  ctx.fill();
-  ctx.fillStyle = '#ffffff';
-  ctx.beginPath();
-  ctx.roundRect(46, 46, 1956, 308, 84);
-  ctx.fill();
-  drawKoi(ctx, 250, 200, 1);
-  drawKoi(ctx, 1798, 200, -1);
-  ctx.fillStyle = '#e8572b';
-  ctx.font = '900 200px "Noto Sans TC","Microsoft JhengHei",sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('鯉魚十球秀', 1024, 212);
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 8;
-  const sign = new THREE.Mesh(
-    new THREE.PlaneGeometry(10.5, 2.05),
-    new THREE.MeshStandardMaterial({ map: tex, roughness: 0.7 }),
-  );
-  sign.position.set(0, 2.95, 0.2);
-  sign.castShadow = true;
-  g.add(sign);
-  box(g, [10.8, 2.25, 0.18], '#ffffff', [0, 2.95, 0.08]);
-  // 背板下方的彩色條紋布幕
-  for (let i = 0; i < 12; i++)
-    box(
-      g,
-      [1.0, 1.85, 0.08],
-      rainbow[i % 10],
-      [-5.5 + i * 1.0, 0.92, 0.02],
-      mat(rainbow[i % 10], { roughness: 0.95 }),
-    );
-}
-
-function drawKoi(ctx: CanvasRenderingContext2D, x: number, y: number, dir: number) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(dir, 1);
-  ctx.fillStyle = '#ff7a3d';
-  ctx.beginPath();
-  ctx.ellipse(0, 0, 150, 78, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath(); // 尾巴
-  ctx.moveTo(-120, 0);
-  ctx.lineTo(-215, -80);
-  ctx.quadraticCurveTo(-180, 0, -215, 80);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = '#ffffff';
-  ctx.beginPath();
-  ctx.ellipse(-20, -30, 55, 30, 0.3, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.ellipse(60, 35, 40, 22, -0.2, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#1f2a1c';
-  ctx.beginPath();
-  ctx.arc(95, -18, 14, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-}
-
-/** 兩側彩旗串與熱氣球般的彩色氣球。回傳旗子（用於輕微擺動）。 */
-function addBunting(scene: THREE.Scene) {
-  const flags: THREE.Mesh[] = [];
-  const poles: [number, number][] = [
-    [-2.1, -1.3],
-    [-2.1, 9.2],
-    [12.1, -1.3],
-    [12.1, 9.2],
-  ];
-  for (const [x, z] of poles) {
-    box(scene, [0.12, 3.6, 0.12], '#ffffff', [x, 1.55, z]);
-    const top = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), mat('#e3a33b'));
-    top.position.set(x, 3.4, z);
-    scene.add(top);
-  }
-  const tri = new THREE.BufferGeometry();
-  tri.setAttribute('position', new THREE.Float32BufferAttribute([-0.17, 0, 0, 0.17, 0, 0, 0, -0.38, 0], 3));
-  tri.computeVertexNormals();
-  const strings: [THREE.Vector3, THREE.Vector3][] = [
-    [new THREE.Vector3(-2.1, 3.3, -1.3), new THREE.Vector3(-2.1, 3.3, 9.2)],
-    [new THREE.Vector3(12.1, 3.3, -1.3), new THREE.Vector3(12.1, 3.3, 9.2)],
-    [new THREE.Vector3(-2.1, 3.3, -1.3), new THREE.Vector3(1.0, 4.4, -1.75)],
-    [new THREE.Vector3(12.1, 3.3, -1.3), new THREE.Vector3(9.0, 4.4, -1.75)],
-  ];
-  let k = 0;
-  for (const [a, b] of strings) {
-    const n = Math.round(a.distanceTo(b) / 0.5);
-    const pts: THREE.Vector3[] = [];
-    for (let i = 0; i <= n; i++) {
-      const t = i / n;
-      const p = a.clone().lerp(b, t);
-      p.y -= Math.sin(t * Math.PI) * 0.55;
-      pts.push(p);
-    }
-    const line = new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints(pts),
-      new THREE.LineBasicMaterial({ color: '#7a6a55' }),
-    );
-    scene.add(line);
-    for (let i = 1; i < n; i++) {
-      const f = new THREE.Mesh(
-        tri,
-        new THREE.MeshStandardMaterial({ color: rainbow[k++ % 10], side: THREE.DoubleSide, roughness: 0.9 }),
-      );
-      f.position.copy(pts[i]);
-      f.lookAt(pts[i].clone().add(new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3(0, 1, 0))));
-      f.userData.phase = k * 0.7;
-      f.userData.rz = f.rotation.z;
-      f.castShadow = true;
-      scene.add(f);
-      flags.push(f);
-    }
-  }
-  // 氣球束
-  const r = rng(5);
-  for (const [x, z] of [
-    [-1.6, -1.7],
-    [11.6, -1.7],
-  ])
-    for (let i = 0; i < 5; i++) {
-      const bx = x + (r() - 0.5) * 0.9,
-        bz = z + (r() - 0.5) * 0.6,
-        by = 4.2 + r() * 1.1;
-      const balloon = new THREE.Mesh(
-        new THREE.SphereGeometry(0.3, 12, 10),
-        new THREE.MeshStandardMaterial({ color: rainbow[(i * 3 + (x < 0 ? 0 : 1)) % 10], roughness: 0.35 }),
-      );
-      balloon.scale.y = 1.18;
-      balloon.position.set(bx, by, bz);
-      balloon.castShadow = true;
-      scene.add(balloon);
-      scene.add(
-        new THREE.Line(
-          new THREE.BufferGeometry().setFromPoints([
-            new THREE.Vector3(bx, by - 0.35, bz),
-            new THREE.Vector3(x, 2.4, z),
-          ]),
-          new THREE.LineBasicMaterial({ color: '#ffffff' }),
-        ),
-      );
-    }
-  return flags;
-}
-
 /** 觀眾席：長椅上坐著各色小觀眾，衝線與謝幕時舉手歡呼。 */
 function addAudience(scene: THREE.Scene) {
   const r = rng(33);
@@ -604,8 +433,7 @@ export function buildWorld(scene: THREE.Scene) {
   addIsland(scene);
   addTrees(scene);
   const stage = addStage(scene);
-  addBackdrop(scene);
-  const flags = addBunting(scene);
+  // 後方ㄇ字型是伴舞學生（見 dancers.ts），不再搭背板與彩旗
   const audience = addAudience(scene);
-  return { seaTime, flags, audience, ...stage };
+  return { seaTime, audience, ...stage };
 }
