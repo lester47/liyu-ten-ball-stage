@@ -267,7 +267,12 @@ let lastCaption = '';
 /** 每格更新字幕、倒數、時鐘與選球說明。 */
 export function updateHud(state: Sample) {
   const ready = show.time === 0 && !show.playing;
-  const subtitle = ready ? '選好節目，準備一起出發！' : state.subtitle;
+  const koiReady = ready && show.cards.some((c) => isFree(c.type));
+  const subtitle = koiReady
+    ? '按「▶ 從頭表演」看圓圈、鯉魚造型'
+    : ready
+      ? '選好節目，準備一起出發！'
+      : state.subtitle;
   const sub = $('#subtitle');
   if (sub.textContent !== subtitle) {
     sub.textContent = subtitle;
