@@ -47,3 +47,12 @@ npm run build
 `sample()` 現在回傳 `targets`、`colors`、`brightness`、`finishLit`，渲染不另外累積這些狀態。測試包含目前小動作停點、字幕週期、倒數紅黃綠與謝幕亮燈。新增節目與視覺規則見規格書第 8 節。
 
 保留原版及節奏秀兩套 60 秒；本次未加入音樂、隊員姓名介紹與跨球道圖案。
+
+
+## 畫面改版：鯉魚市集風格（2026-11-25，Claude）
+
+- 程式拆檔：`src/state.ts`（節目單與播放狀態、localStorage）、`src/ui.ts`（版面與操作盤）、`src/stage/world.ts`（小島、舞台、背板、彩旗、觀眾席、光影）、`src/stage/sphero.ts`（發光球）、`src/stage/kid.ts`（孩子）、`src/stage/labels.ts`（膠囊標籤）、`src/stage/palette.ts`（配色）。`src/timeline.ts` 時間軸邏輯未改。
+- 光影與配色沿用鯉魚市集白天設定：半球光、暖色太陽、柔和陰影、ACES 色調、淡藍霧。
+- 球：帶自身顏色的半透明外殼、強自發光 LED、地面彩色光圈與接觸陰影；選取時外圈脈動。
+- 停點名稱平貼在舞台前緣；觀眾在十球到站與謝幕時舉手歡呼（由時間軸決定，回拉一致）。
+- `npm run format` 以 Prettier 排版原始碼。
