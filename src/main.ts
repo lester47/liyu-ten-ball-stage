@@ -7,7 +7,7 @@ import { createSphero } from './stage/sphero';
 import { createKid } from './stage/kid';
 import { radialTexture } from './stage/labels';
 import { createFreeMarks } from './stage/freeMarks';
-import { FREE_FIRST, isFree, koiProp } from './freeShow';
+import { isBow, isFree, koiProp } from './freeShow';
 import './style.css';
 
 mountMarkup();
@@ -104,7 +104,7 @@ function frame(now: number) {
   const trailStates = dash
     ? Array.from({ length: 6 }, (_, k) => sample(segments, Math.max(seg!.start, time - (k + 1) * 0.06)))
     : [];
-  const bowing = (seg?.type === 7 || seg?.type === FREE_FIRST + 8) && !seg.transition;
+  const bowing = (seg?.type === 7 || (!!seg && isBow(seg.type))) && !seg.transition;
   // 自由走位：收起球道，換成這段要用的地上膠帶
   const freeNow = !!seg && (seg.free || isFree(seg.type));
   world.lanes.visible = !freeNow;
@@ -150,7 +150,7 @@ function frame(now: number) {
 
   // 觀眾：十球到站與謝幕時歡呼（由時間軸決定，回拉結果一致）
   const cheer =
-    (!freeNow && allArrived) || (dash && state.local > 2.5) || (bowing && seg?.type === FREE_FIRST + 8);
+    (!freeNow && allArrived) || (dash && state.local > 2.5) || (bowing && !!seg && isBow(seg.type));
   world.audience.forEach((p) => {
     const lift = cheer ? 2.6 + Math.sin(time * 7 + p.phase) * 0.25 : 0.25;
     p.arms[0].rotation.z = -lift;

@@ -1,6 +1,6 @@
 import Sortable from 'sortablejs';
 import { compile, sample, template, energetic, names, durations, summaries } from './timeline';
-import { isFree, standardShow } from './freeShow';
+import { isFree, SHOWS, showCards, showOf } from './freeShow';
 import { show, total, saveCards } from './state';
 import { teamColor, rainbow } from './stage/palette';
 
@@ -13,7 +13,7 @@ const ballName = (i: number) => `${i < 5 ? 'L' : 'R'}${(i % 5) + 1}`;
 
 const involved = (i: number) =>
   isFree(i)
-    ? '全體 · 整個舞台自由走位'
+    ? `${SHOWS.find((x) => x.id === showOf(i))!.label} · 全體自由走位`
     : i === 0
       ? 'L1 · R1'
       : i === 1
@@ -21,6 +21,14 @@ const involved = (i: number) =>
         : i === 3
           ? '單數移動 · 雙數定格'
           : 'L1–L5 · R1–R5';
+
+/** 節目庫裡每套自由走位節目的小標題。 */
+const groupHeading = (i: number) => {
+  const id = showOf(i);
+  if (!id || showOf(i - 1) === id) return i === 0 ? '<h4 class="library-group">球道小單元</h4>' : '';
+  const x = SHOWS.find((v) => v.id === id)!;
+  return `<h4 class="library-group">${x.label} · ${x.title}</h4>`;
+};
 
 /** 建立整頁版面。 */
 export function mountMarkup() {
@@ -75,7 +83,7 @@ export function mountMarkup() {
             (
               name,
               i,
-            ) => `<article class="library-card${isFree(i) ? ' free' : ''}" data-type="${i}" style="--c:${rainbow[i % 10]}">
+            ) => `${groupHeading(i)}<article class="library-card${isFree(i) ? ' free' : ''}" data-type="${i}" style="--c:${rainbow[i % 10]}">
           <div><h3>${name}<span>${durations[i]} 秒</span></h3><p>${summaries[i]}</p><small>${involved(i)}</small></div>
           <button class="add" data-add="${i}" aria-label="加入${name}">＋ 加入</button></article>`,
           )
@@ -85,8 +93,12 @@ export function mountMarkup() {
     <div class="panel playlist-panel">
       <div class="section-head playlist-head">
         <span class="section-title"><span class="no show">單</span>我的節目單</span>
-        <div class="template-buttons"><button id="koi-show" class="btn small" title="標準動作範例：前進、後退、拉鍊、圍圈、繞圈、集合、排魚、一直線、謝幕">🐟 鯉魚秀（新）</button><button id="energetic" class="btn ghost small">節奏秀</button><button id="reset" class="btn ghost small">原版</button></div>
+        <div class="template-buttons"><button id="energetic" class="btn ghost small">節奏秀</button><button id="reset" class="btn ghost small">原版</button></div>
       </div>
+      <div class="show-picker" aria-label="標準動作範本">${SHOWS.map(
+        (x) =>
+          `<button class="show-pick" data-show="${x.id}"><b>${x.label}</b><small>${x.blurb}</small></button>`,
+      ).join('')}</div>
       <div class="summary"><strong id="total"></strong><span id="difference"></span></div>
       <div id="playlist"></div>
       <p id="save-status" role="status">${show.storageWarning || '編輯後自動儲存在此瀏覽器'}</p>
@@ -109,6 +121,12 @@ export function edit() {
 
 export function renderList() {
   const { cards, segments } = show;
+  // 目前節目單整套屬於哪個範本，就把那顆按鈕標亮
+  document
+    .querySelectorAll<HTMLElement>('[data-show]')
+    .forEach((b) =>
+      b.classList.toggle('on', cards.length > 0 && cards.every((c) => showOf(c.type) === b.dataset.show)),
+    );
   $('#total').textContent = `${Number(total().toFixed(1))} 秒`;
   const delta = total() - 60;
   $('#difference').textContent =
@@ -224,10 +242,13 @@ export function bindControls() {
       }
     },
   });
-  $('#koi-show').onclick = () => {
-    show.cards = standardShow();
-    edit();
-  };
+  document.querySelectorAll<HTMLElement>('[data-show]').forEach(
+    (b) =>
+      (b.onclick = () => {
+        show.cards = showCards(b.dataset.show as (typeof SHOWS)[number]['id']);
+        edit();
+      }),
+  );
   $('#energetic').onclick = () => {
     show.cards = energetic();
     edit();
