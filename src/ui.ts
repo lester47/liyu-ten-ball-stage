@@ -1,5 +1,6 @@
 import Sortable from 'sortablejs';
 import { compile, sample, template, energetic, names, durations, summaries } from './timeline';
+import { isFree, standardShow } from './freeShow';
 import { show, total, saveCards } from './state';
 import { teamColor, rainbow } from './stage/palette';
 
@@ -11,7 +12,15 @@ const VIEW_ICONS = ['🎟️', '🛰️', '⬅️', '➡️', '🔄', '👨‍�
 const ballName = (i: number) => `${i < 5 ? 'L' : 'R'}${(i % 5) + 1}`;
 
 const involved = (i: number) =>
-  i === 0 ? 'L1 · R1' : i === 1 ? 'L2–L5 · R2–R5' : i === 3 ? '單數移動 · 雙數定格' : 'L1–L5 · R1–R5';
+  isFree(i)
+    ? '全體 · 整個舞台自由走位'
+    : i === 0
+      ? 'L1 · R1'
+      : i === 1
+        ? 'L2–L5 · R2–R5'
+        : i === 3
+          ? '單數移動 · 雙數定格'
+          : 'L1–L5 · R1–R5';
 
 /** 建立整頁版面。 */
 export function mountMarkup() {
@@ -33,6 +42,7 @@ export function mountMarkup() {
         <strong id="countdown"></strong>
       </div>
       <div class="teams"><b class="team-l"><i></i>藍隊 L</b><b class="team-r"><i></i>橘隊 R</b></div>
+      <div id="tip" class="tip-card" hidden aria-live="polite"><p class="kid"></p><p class="ok"></p></div>
       <div id="selection" class="hint-pill">點選一顆球，查看走位</div>
       <div class="views" aria-label="相機視角">${VIEW_NAMES.map(
         (x, i) =>
@@ -57,12 +67,15 @@ export function mountMarkup() {
     <div class="panel">
       <details class="library-section" open>
         <summary>
-          <span class="section-title"><span class="no">庫</span>節目庫 <small>13 種小單元</small></span>
+          <span class="section-title"><span class="no">庫</span>節目庫 <small>${names.length} 種小單元</small></span>
           <span class="hint">拖曳或點「加入」</span>
         </summary>
         <div id="library">${names
           .map(
-            (name, i) => `<article class="library-card" data-type="${i}" style="--c:${rainbow[i % 10]}">
+            (
+              name,
+              i,
+            ) => `<article class="library-card${isFree(i) ? ' free' : ''}" data-type="${i}" style="--c:${rainbow[i % 10]}">
           <div><h3>${name}<span>${durations[i]} 秒</span></h3><p>${summaries[i]}</p><small>${involved(i)}</small></div>
           <button class="add" data-add="${i}" aria-label="加入${name}">＋ 加入</button></article>`,
           )
@@ -72,7 +85,7 @@ export function mountMarkup() {
     <div class="panel playlist-panel">
       <div class="section-head playlist-head">
         <span class="section-title"><span class="no show">單</span>我的節目單</span>
-        <div class="template-buttons"><button id="energetic" class="btn small">節奏秀 60 秒</button><button id="reset" class="btn ghost small">原版 60 秒</button></div>
+        <div class="template-buttons"><button id="koi-show" class="btn small" title="標準動作範例：前進、後退、拉鍊、圍圈、繞圈、集合、排魚、一直線、謝幕">🐟 鯉魚秀（新）</button><button id="energetic" class="btn ghost small">節奏秀</button><button id="reset" class="btn ghost small">原版</button></div>
       </div>
       <div class="summary"><strong id="total"></strong><span id="difference"></span></div>
       <div id="playlist"></div>
@@ -211,6 +224,10 @@ export function bindControls() {
       }
     },
   });
+  $('#koi-show').onclick = () => {
+    show.cards = standardShow();
+    edit();
+  };
   $('#energetic').onclick = () => {
     show.cards = energetic();
     edit();
@@ -278,8 +295,25 @@ export function updateHud(state: Sample) {
   document
     .querySelectorAll<HTMLElement>('.show-card')
     .forEach((c) => c.classList.toggle('active', c.dataset.id === state.segment?.cardId));
+  // 自由走位段落：這段要做什麼＋做不到也沒關係
+  const tipBox = $('#tip');
+  const tip = ready ? undefined : state.tip;
+  tipBox.hidden = !tip;
+  if (tip && tipBox.dataset.kid !== tip.kid) {
+    tipBox.dataset.kid = tip.kid;
+    tipBox.querySelector('.kid')!.textContent = `🎮 這段要做：${tip.kid}`;
+    tipBox.querySelector('.ok')!.textContent = `😊 做不到也沒關係：${tip.ok}`;
+  }
   const sel = $('#selection');
-  if (show.selected >= 0) {
+  if (show.selected >= 0 && state.segment && (state.segment.free || isFree(state.segment.type))) {
+    const i = show.selected,
+      p = state.points[i],
+      g = state.targetPoints[i];
+    sel.innerHTML = `<span class="no" style="background:${teamColor(i)}">${ballName(i)}</span>自由走位 · 位置 (${p.x.toFixed(
+      1,
+    )}, ${p.z.toFixed(1)}) m · 目標 (${g.x.toFixed(1)}, ${g.z.toFixed(1)}) m · 大概到就好`;
+    sel.classList.add('on');
+  } else if (show.selected >= 0) {
     const i = show.selected,
       s = state.segment;
     const moving = s

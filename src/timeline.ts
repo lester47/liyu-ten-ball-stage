@@ -1,3 +1,21 @@
+import {
+  FREE_FIRST,
+  freeDurations,
+  freeEnd,
+  freeLights,
+  freeMotion,
+  freeNames,
+  freeStart,
+  freeSubtitle,
+  freeSummaries,
+  freeTarget,
+  freeTips,
+  isFree,
+  lanePts,
+  lerpPt,
+  type Pt,
+} from './freeShow';
+
 export const names = [
   '慢速亮相',
   '依序接力',
@@ -12,8 +30,9 @@ export const names = [
   '交錯開合',
   '假動作急停',
   '節拍蓄力',
+  ...freeNames,
 ];
-export const durations = [6, 8, 8, 8, 8, 7, 8, 7, 8, 8, 8, 6, 8];
+export const durations = [6, 8, 8, 8, 8, 7, 8, 7, 8, 8, 8, 6, 8, ...freeDurations];
 export const summaries = [
   '第一對緩緩前進，點亮舞台',
   '2 至 5 號依序成對出發',
@@ -28,6 +47,7 @@ export const summaries = [
   '單雙交錯開合，最後一起收攏',
   '先快退、突然收回，再整齊急停',
   '短促脈衝三連拍，蓄力等待衝線',
+  ...freeSummaries,
 ];
 export type Card = { id: string; type: number; duration: number };
 export type Segment = {
@@ -39,7 +59,17 @@ export type Segment = {
   from: number[];
   to: number[];
   transition: boolean;
+  /** 整個舞台自由走位的段落（或從自由隊形出發的換位），位置以舞台座標計算。 */
+  free?: boolean;
+  fromPts: Pt[];
+  toPts: Pt[];
 };
+/** 自由隊形換算成「距自己站位線幾公尺」，給舊的顯示與燈光使用。 */
+const pseudoD = (pts: Pt[]) => pts.map((p, i) => (i < 5 ? p.x : 10 - p.x));
+const samePts = (a: Pt[], b: Pt[]) =>
+  a.every((p, i) => Math.abs(p.x - b[i].x) < 1e-5 && Math.abs(p.z - b[i].z) < 1e-5);
+const laneZ = (n: number) => 7 - n * 1.5;
+const onLanes = (pts: Pt[]) => pts.every((p, i) => Math.abs(p.z - laneZ(i % 5)) < 1e-5);
 export const template = (): Card[] =>
   durations.slice(0, 8).map((duration, type) => ({ id: crypto.randomUUID(), type, duration }));
 export const energetic = (): Card[] =>
@@ -121,25 +151,61 @@ export function motion(type: number, t: number, from: number[]): number[] {
 }
 export function compile(cards: Card[]): Segment[] {
   let state = all(1),
+    pts = lanePts(state),
+    lane = true,
     time = 0;
   const segments: Segment[] = [];
+  const move = (card: Card, toPts: Pt[], toD: number[] | null) => {
+    const free = !lane || !toD;
+    segments.push({
+      id: `move-${card.id}`,
+      cardId: card.id,
+      type: card.type,
+      start: time,
+      end: time + 2,
+      from: [...state],
+      to: toD ? [...toD] : pseudoD(toPts),
+      transition: true,
+      free,
+      fromPts: pts,
+      toPts,
+    });
+    time += 2;
+    pts = toPts;
+    state = toD ? [...toD] : pseudoD(toPts);
+    lane = !!toD;
+  };
   for (const card of cards) {
-    const required = initial(card.type);
-    if (required && required.some((d, i) => Math.abs(d - state[i]) > 0.00001)) {
+    if (isFree(card.type)) {
+      const start = freeStart(card.type);
+      if (!samePts(start, pts)) move(card, start, onLanes(start) ? pseudoD(start) : null);
+      const end = freeEnd(card.type);
       segments.push({
-        id: `move-${card.id}`,
+        id: card.id,
         cardId: card.id,
         type: card.type,
         start: time,
-        end: time + 2,
+        end: time + card.duration,
         from: [...state],
-        to: [...required],
-        transition: true,
+        to: pseudoD(end),
+        transition: false,
+        free: true,
+        fromPts: pts,
+        toPts: end,
       });
-      time += 2;
-      state = required;
+      pts = end;
+      lane = onLanes(end);
+      state = pseudoD(end);
+      time += card.duration;
+      continue;
     }
-    const to = motion(card.type, durations[card.type], state);
+    const required = initial(card.type);
+    if (required && (!lane || required.some((d, i) => Math.abs(d - state[i]) > 0.00001)))
+      move(card, lanePts(required), required);
+    // 倒數、謝幕沿用前段球位：前段是自由隊形時就原地停住
+    const hold = !lane;
+    const to = hold ? [...state] : motion(card.type, durations[card.type], state);
+    const toPts = hold ? pts : lanePts(to);
     segments.push({
       id: card.id,
       cardId: card.id,
@@ -149,8 +215,12 @@ export function compile(cards: Card[]): Segment[] {
       from: [...state],
       to,
       transition: false,
+      free: hold,
+      fromPts: pts,
+      toPts,
     });
     state = to;
+    pts = toPts;
     time += card.duration;
   }
   return segments;
@@ -187,6 +257,7 @@ export function targets(type: number, t: number, from: number[]): number[] {
   });
 }
 function lighting(type: number, t: number, positions: number[]) {
+  if (type >= FREE_FIRST) return freeLights(type, t);
   const colors = [...rainbow],
     brightness = all(1);
   for (let i = 0; i < 10; i++) {
@@ -223,12 +294,32 @@ export function sample(segments: Segment[], time: number) {
       colors: [...rainbow],
       brightness: all(0.35),
       finishLit: all(0),
+      points: lanePts(all(1)),
+      targetPoints: lanePts(all(1)),
+      tip: undefined as (typeof freeTips)[number] | undefined,
     };
   const progress = Math.max(0, Math.min(1, (time - segment.start) / (segment.end - segment.start)));
   const t = progress * durations[segment.type];
-  const positions = segment.transition
-    ? segment.from.map((d, i) => lerp(d, segment.to[i], progress))
-    : motion(segment.type, t, segment.from);
+  const freeCard = !segment.transition && isFree(segment.type);
+  // 舞台座標：球道段由距離換算；自由走位段直接取標準路線；自由換位直線移動
+  let points: Pt[];
+  let positions: number[];
+  if (segment.transition && segment.free) {
+    points = segment.fromPts.map((p, i) => lerpPt(p, segment.toPts[i], progress));
+    positions = pseudoD(points);
+  } else if (segment.transition) {
+    positions = segment.from.map((d, i) => lerp(d, segment.to[i], progress));
+    points = lanePts(positions);
+  } else if (freeCard) {
+    points = freeMotion(segment.type, t);
+    positions = pseudoD(points);
+  } else if (segment.free) {
+    points = segment.fromPts;
+    positions = [...segment.from];
+  } else {
+    positions = motion(segment.type, t, segment.from);
+    points = lanePts(positions);
+  }
   let subtitle = names[segment.type],
     countdown = '';
   if (segment.transition) subtitle = `換位準備 · ${names[segment.type]}`;
@@ -252,7 +343,19 @@ export function sample(segments: Segment[], time: number) {
   else if (segment.type === 12)
     subtitle = t < 6 ? ['第一拍！', '第二拍！', '第三拍！'][Math.floor(t / 2)] : '準備，全場一起倒數！';
   else if (segment.type === 7) subtitle = '掌聲送給鯉魚機器人隊！';
-  const goal = segment.transition ? segment.to : targets(segment.type, t, segment.from);
+  else if (freeCard) subtitle = freeSubtitle(segment.type, t);
+  const targetPoints = segment.transition
+    ? segment.toPts
+    : freeCard
+      ? freeTarget(segment.type, t)
+      : segment.free
+        ? segment.fromPts
+        : lanePts(targets(segment.type, t, segment.from));
+  const goal = segment.transition
+    ? segment.to
+    : segment.free
+      ? pseudoD(targetPoints)
+      : targets(segment.type, t, segment.from);
   let lights = lighting(segment.type, t, positions);
   if (segment.transition) {
     const previous = segments[segments.indexOf(segment) - 1];
@@ -269,5 +372,18 @@ export function sample(segments: Segment[], time: number) {
     while (prev >= 0 && !segments[prev].transition && segments[prev].type === 7) prev--;
     if (prev >= 0 && !segments[prev].transition && segments[prev].type === 6) finishLit = all(1);
   }
-  return { positions, subtitle, countdown, segment, local: t, targets: goal, ...lights, finishLit };
+  const tip = freeCard ? freeTips[segment.type - FREE_FIRST] : undefined;
+  return {
+    positions,
+    subtitle,
+    countdown,
+    segment,
+    local: t,
+    targets: goal,
+    ...lights,
+    finishLit,
+    points,
+    targetPoints,
+    tip,
+  };
 }

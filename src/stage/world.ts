@@ -296,11 +296,14 @@ function addStage(scene: THREE.Scene) {
   // 前方台階
   box(scene, [3.4, 0.25, 0.6], '#d9ae78', [5, -0.38, 9.6]);
 
+  // 球道、停點與終點：自由走位的段落會整組隱藏
+  const lanes = new THREE.Group();
+  scene.add(lanes);
   for (let lane = 0; lane < 5; lane++) {
     const z = laneZ(lane);
-    box(scene, [10, 0.012, 1.25], LANE_COLORS[lane], [5, 0.035, z]);
-    box(scene, [10, 0.014, 0.04], '#ffffff', [5, 0.04, z + 0.69]);
-    box(scene, [0.03, 0.016, 1.25], '#a9b7c0', [5, 0.042, z]); // 中線
+    box(lanes, [10, 0.012, 1.25], LANE_COLORS[lane], [5, 0.035, z]);
+    box(lanes, [10, 0.014, 0.04], '#ffffff', [5, 0.04, z + 0.69]);
+    box(lanes, [0.03, 0.016, 1.25], '#a9b7c0', [5, 0.042, z]); // 中線
     for (const left of [true, false])
       for (const s of STOPS) {
         const dot = new THREE.Mesh(
@@ -309,10 +312,10 @@ function addStage(scene: THREE.Scene) {
         );
         dot.position.set(left ? s.d : 10 - s.d, 0.046, z + 0.5);
         dot.receiveShadow = true;
-        scene.add(dot);
+        lanes.add(dot);
         if (s.d !== 1)
           box(
-            scene,
+            lanes,
             [0.025, 0.013, 1.0],
             s.color,
             [left ? s.d : 10 - s.d, 0.043, z - 0.08],
@@ -320,7 +323,7 @@ function addStage(scene: THREE.Scene) {
           );
       }
   }
-  box(scene, [10, 0.014, 0.04], '#ffffff', [5, 0.04, laneZ(4) - 0.69]);
+  box(lanes, [10, 0.014, 0.04], '#ffffff', [5, 0.04, laneZ(4) - 0.69]);
 
   // 停點名稱：舞台前緣的膠囊標籤
   for (const s of STOPS)
@@ -341,13 +344,13 @@ function addStage(scene: THREE.Scene) {
       flat.rotation.x = -Math.PI / 2;
       // 急停與內點只差 0.5 m，前後錯開避免標籤重疊
       flat.position.set(left ? s.d : 10 - s.d, 0.04, s.d === 3.8 ? 8.3 : 8.85);
-      scene.add(flat);
+      lanes.add(flat);
     }
 
   // 終點線（外點 1.0 m）：整條欄杆＋每條球道一段，到站亮金色
   const finishRails = [1, 9].map((x) =>
     box(
-      scene,
+      lanes,
       [0.14, 0.03, 7.4],
       '#c9d3da',
       [x, 0.05, 4],
@@ -357,7 +360,7 @@ function addStage(scene: THREE.Scene) {
   const finish = Array.from({ length: 10 }, (_, i) => {
     const left = i < 5;
     return box(
-      scene,
+      lanes,
       [0.18, 0.035, 1.15],
       '#fff',
       [left ? 1 : 9, 0.06, laneZ(i % 5)],
@@ -368,7 +371,7 @@ function addStage(scene: THREE.Scene) {
   const audienceText = groundText('觀 眾 席', '#2f6a2f', 4, 0.8);
   audienceText.position.set(5, -0.12, 11.3);
   scene.add(audienceText);
-  return { finish, finishRails };
+  return { finish, finishRails, lanes };
 }
 
 /** 舞台後方大背板：彩虹拱門＋「鯉魚十球秀」招牌＋鯉魚。 */

@@ -83,3 +83,45 @@ test('換位延續前段燈色並調暗', () => {
   assert.equal(sample(s, move.start + 1).colors[0], '#ffd34e');
   assert.ok(sample(s, move.start + 1).brightness[0] < 1);
 });
+
+import { standardShow, FREE_FIRST } from './freeShow.ts';
+test('鯉魚十球秀（新）：60 秒、無換位、標準路線不相撞且速度溫和', () => {
+  const s = compile(standardShow());
+  assert.equal(s.at(-1)!.end, 60);
+  assert.equal(s.filter((x) => x.transition).length, 0);
+  let minGap = Infinity,
+    maxSpeed = 0;
+  let prev = sample(s, 0).points;
+  for (let t = 0.01; t < 60; t += 0.01) {
+    const p = sample(s, t).points;
+    for (let a = 0; a < 10; a++) {
+      assert.ok(p[a].x >= 0.4 && p[a].x <= 9.6 && p[a].z >= 0.4 && p[a].z <= 7.6, `出界 t=${t} ball=${a}`);
+      maxSpeed = Math.max(maxSpeed, Math.hypot(p[a].x - prev[a].x, p[a].z - prev[a].z) / 0.01);
+      for (let b = a + 1; b < 10; b++)
+        minGap = Math.min(minGap, Math.hypot(p[a].x - p[b].x, p[a].z - p[b].z));
+    }
+    prev = p;
+  }
+  assert.ok(minGap >= 0.7, `球距 ${minGap.toFixed(2)} m`);
+  assert.ok(maxSpeed <= 1.6, `最高速 ${maxSpeed.toFixed(2)} m/s`);
+});
+test('自由走位與球道節目可以混排：自動換位、倒數沿用自由隊形', () => {
+  const free = standardShow();
+  const c = [...template().slice(0, 2), free[3], { id: 'cd', type: 5, duration: 7 }, template()[0]];
+  const s = compile(c);
+  const moveIn = s.find((x) => x.cardId === free[3].id && x.transition)!;
+  assert.ok(moveIn.free);
+  const hold = s.find((x) => x.id === 'cd')!;
+  assert.ok(hold.free);
+  assert.deepEqual(sample(s, hold.start + 1).points, sample(s, hold.start + 5).points);
+  const back = s.find((x) => x.cardId === c[4].id && x.transition)!;
+  assert.ok(back.free);
+  for (let t = 0; t < s.at(-1)!.end; t += 0.01) {
+    const a = sample(s, t).points,
+      b = sample(s, t + 0.001).points;
+    a.forEach((p, i) => assert.ok(Math.hypot(p.x - b[i].x, p.z - b[i].z) < 0.02, `t=${t}`));
+  }
+  assert.ok(sample(s, moveIn.end + 1).tip);
+  assert.equal(sample(s, 1).tip, undefined);
+  assert.equal(s.find((x) => x.id === free[3].id)!.type, FREE_FIRST + 3);
+});

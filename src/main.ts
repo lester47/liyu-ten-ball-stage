@@ -6,6 +6,8 @@ import { buildWorld, createRenderer, laneZ, setView } from './stage/world';
 import { createSphero } from './stage/sphero';
 import { createKid } from './stage/kid';
 import { radialTexture } from './stage/labels';
+import { createFreeMarks } from './stage/freeMarks';
+import { FREE_FIRST, isFree, koiProp } from './freeShow';
 import './style.css';
 
 mountMarkup();
@@ -15,6 +17,7 @@ renderList();
 const viewport = $('#viewport');
 const { scene, camera, renderer, composer, controls } = createRenderer(viewport);
 const world = buildWorld(scene);
+const marks = createFreeMarks(scene);
 setView(camera, controls, 0);
 document
   .querySelectorAll<HTMLElement>('[data-view]')
@@ -101,12 +104,19 @@ function frame(now: number) {
   const trailStates = dash
     ? Array.from({ length: 6 }, (_, k) => sample(segments, Math.max(seg!.start, time - (k + 1) * 0.06)))
     : [];
-  const bowing = seg?.type === 7 && !seg.transition;
+  const bowing = (seg?.type === 7 || seg?.type === FREE_FIRST + 8) && !seg.transition;
+  // 自由走位：收起球道，換成這段要用的地上膠帶
+  const freeNow = !!seg && (seg.free || isFree(seg.type));
+  world.lanes.visible = !freeNow;
+  marks.update(
+    seg && isFree(seg.type) ? seg.type : null,
+    seg ? koiProp(seg.type, seg.transition ? 0 : state.local) : 0,
+    secs,
+  );
 
   spheros.forEach((s, i) => {
-    const d = state.positions[i];
-    const x = i < 5 ? d : 10 - d;
-    s.root.position.x = x;
+    const p = state.points[i];
+    s.root.position.set(p.x, s.root.position.y, p.z);
     s.update(state.colors[i], state.brightness[i], show.selected === i, secs);
 
     const arrived = state.finishLit[i] > 0;
@@ -119,12 +129,13 @@ function frame(now: number) {
     trails[i].forEach((m, k) => {
       m.visible = dash && state.local < (odd ? 1.5 : 2.5) && state.local > (odd ? 0 : 1);
       if (!m.visible) return;
-      const td = trailStates[k].positions[i];
-      m.position.set(i < 5 ? td : 10 - td, 0.2, laneZ(i % 5));
+      const tp = trailStates[k].points[i];
+      m.position.set(tp.x, 0.2, tp.z);
       (m.material as THREE.MeshBasicMaterial).color.set(state.colors[i]);
     });
 
-    const movingNow = !seg?.transition && Math.abs(state.positions[i] - previous.positions[i]) > 0.001;
+    const movingNow =
+      !seg?.transition && Math.hypot(p.x - previous.points[i].x, p.z - previous.points[i].z) > 0.001;
     const t = state.local;
     kids[i].pose(bowing ? (t < 2 ? 'wave' : t < 5 ? 'bow' : 'idle') : movingNow ? 'go' : 'idle', t);
   });
@@ -138,7 +149,8 @@ function frame(now: number) {
   });
 
   // 觀眾：十球到站與謝幕時歡呼（由時間軸決定，回拉結果一致）
-  const cheer = allArrived || (dash && state.local > 2.5);
+  const cheer =
+    (!freeNow && allArrived) || (dash && state.local > 2.5) || (bowing && seg?.type === FREE_FIRST + 8);
   world.audience.forEach((p) => {
     const lift = cheer ? 2.6 + Math.sin(time * 7 + p.phase) * 0.25 : 0.25;
     p.arms[0].rotation.z = -lift;
