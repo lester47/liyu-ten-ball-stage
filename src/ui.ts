@@ -57,7 +57,7 @@ export function mountMarkup() {
           `<button class="tbtn" data-view="${i}"><span aria-hidden="true">${VIEW_ICONS[i]}</span>${x}</button>`,
       ).join(
         '',
-      )}<button id="glow" class="tbtn" title="自動模式在小螢幕及低核心裝置關閉後製光暈"><span aria-hidden="true">✨</span>光暈：自動</button></div>
+      )}<button id="glow" class="tbtn" title="自動模式在小螢幕及低核心裝置關閉後製光暈"><span aria-hidden="true">✨</span>光暈：自動</button><button id="stage-only" class="tbtn" title="放大舞台、收起右側節目單；時間軸和播放鍵保留"><span aria-hidden="true">⛶</span><b>全螢幕</b></button></div>
     </div>
     <section class="transport">
       <div class="play-row">
@@ -272,6 +272,23 @@ export function bindControls() {
     show.previewEnd = null;
     show.time = Number((e.target as HTMLInputElement).value);
   };
+  // 全螢幕：放大舞台、收起右側節目單，時間軸與播放控制保留
+  const fsButton = $('#stage-only');
+  const setStageOnly = (on: boolean) => {
+    document.body.classList.toggle('stage-only', on);
+    fsButton.querySelector('b')!.textContent = on ? '退出全螢幕' : '全螢幕';
+  };
+  fsButton.onclick = () => {
+    const on = !document.body.classList.contains('stage-only');
+    setStageOnly(on);
+    // 瀏覽器支援時一併進入真正的全螢幕；不支援（例如 iPhone）就只放大版面
+    if (on) document.documentElement.requestFullscreen?.().catch(() => {});
+    else if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  };
+  // 按 Esc 離開瀏覽器全螢幕時，版面也一起還原
+  document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement) setStageOnly(false);
+  });
   $('#speed').onchange = (e) => (show.speed = Number((e.target as HTMLSelectElement).value));
   $('#timeline').onclick = (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>('[data-time]');

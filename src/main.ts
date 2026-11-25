@@ -8,7 +8,7 @@ import { createKid } from './stage/kid';
 import { radialTexture } from './stage/labels';
 import { createFreeMarks } from './stage/freeMarks';
 import { createDancers } from './stage/dancers';
-import { isBow, isFree, koiProp } from './freeShow';
+import { freeDance, isBow, isFree, koiProp, type DanceMove } from './freeShow';
 import './style.css';
 
 mountMarkup();
@@ -161,7 +161,14 @@ function frame(now: number) {
   });
   // 海浪（與表演無關）；伴舞學生跟著節目時間跳
   world.seaTime.value = secs;
-  dancers.update(time);
+  // 伴舞學生：依這段的舞步跳（準備時輕輕搖、換位時拍手）
+  let move: DanceMove = 'clap';
+  if (time === 0 && !show.playing) move = 'idle';
+  else if (seg && !seg.transition && isFree(seg.type)) move = freeDance(seg.type, state.local);
+  else if (seg?.type === 7 && !seg.transition) move = 'bow';
+  else if (seg?.type === 5 && !seg.transition) move = 'count';
+  else if (seg?.type === 6 && !seg.transition) move = 'cheer';
+  dancers.update(move, time, state.local);
 
   controls.update();
   const useBloom =
