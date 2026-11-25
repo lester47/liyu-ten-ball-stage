@@ -788,6 +788,47 @@ aside {
   }
 }
 
+/* ---------- 標準動作範本：四套自由走位節目 ---------- */
+.show-picker {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin: 10px 0 4px;
+}
+.show-pick {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 7px 10px;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  background: #fffdf6;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.show-pick b {
+  font-size: 0.9rem;
+}
+.show-pick small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+.show-pick:hover,
+.show-pick.on {
+  border-color: var(--primary);
+  background: #f1fae9;
+}
+.library-group {
+  grid-column: 1 / -1;
+  margin: 6px 2px 0;
+  font-size: 0.82rem;
+  color: var(--ink);
+}
+
 /* ---------- 平板直向與手機：上下排 ---------- */
 @media (max-width: 1000px) {
   .top {

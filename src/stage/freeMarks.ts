@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { FISH_MARKS, FREE_CENTER, FREE_FIRST, LINE_Z, RING_R, zipLane } from '../freeShow';
+import { freeCard, isFree, type Mark } from '../freeShow';
+import { C as FREE_CENTER } from '../shows/kit';
 import { TEAM } from './palette';
 
 /*
@@ -28,18 +29,21 @@ function strip(
   return mesh;
 }
 
-function dashedCircle(parent: THREE.Object3D, r: number, m: THREE.Material, n = 36) {
+function dashedRing(parent: THREE.Object3D, rx: number, rz: number, m: THREE.Material, n = 36) {
   for (let k = 0; k < n; k++) {
     const a = ((k + 0.5) / n) * Math.PI * 2;
-    const len = ((Math.PI * 2 * r) / n) * 0.6;
+    // 切線方向：膠帶沿著圓（或橢圓）貼
+    const dx = -Math.sin(a) * rx,
+      dz = Math.cos(a) * rz;
+    const len = ((Math.hypot(dx, dz) * Math.PI * 2) / n) * 0.6;
     strip(
       parent,
       len,
       0.07,
-      FREE_CENTER.x + Math.cos(a) * r,
-      FREE_CENTER.z + Math.sin(a) * r,
+      FREE_CENTER.x + Math.cos(a) * rx,
+      FREE_CENTER.z + Math.sin(a) * rz,
       m,
-      -a - Math.PI / 2,
+      -Math.atan2(dz, dx),
     );
   }
 }
@@ -89,42 +93,46 @@ function buildKoi() {
   return { group: g, materials: [orange, white, ink] };
 }
 
+const teamOf = (x: number) => (x < 5 ? TEAM.left : TEAM.right);
+
+function buildMarks(parent: THREE.Object3D, marks: Mark[]) {
+  const tape = tapeMat(TAPE);
+  const colored = (color?: string, x = 0) =>
+    color === 'team' ? tapeMat(teamOf(x), 0.85) : color ? tapeMat(color, 0.85) : tape;
+  for (const m of marks) {
+    if (m.k === 'ring') dashedRing(parent, m.rx, m.rz ?? m.rx, colored(m.color), m.n ?? 36);
+    if (m.k === 'line') {
+      const x0 = m.x0 ?? 0.4,
+        x1 = m.x1 ?? 9.6;
+      strip(parent, x1 - x0, m.width ?? 0.08, (x0 + x1) / 2, m.z, colored(m.color));
+    }
+    if (m.k === 'x') m.pts.forEach((p) => cross(parent, p.x, p.z, colored(m.color, p.x)));
+    if (m.k === 'tick') m.pts.forEach((p) => strip(parent, 0.08, 0.9, p.x, p.z, colored(m.color, p.x)));
+    if (m.k === 'dot')
+      m.pts.forEach((p) => {
+        const r = (m.size ?? 0.36) / 2;
+        const disc = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.012, 24), colored(m.color, p.x));
+        disc.position.set(p.x, 0.042, p.z);
+        disc.receiveShadow = true;
+        parent.add(disc);
+      });
+  }
+}
+
 export function createFreeMarks(scene: THREE.Scene) {
   const root = new THREE.Group();
   scene.add(root);
-  const tape = tapeMat(TAPE);
-  const groups = Array.from({ length: 9 }, () => {
-    const g = new THREE.Group();
-    root.add(g);
-    return g;
-  });
-
-  // 前進／後退：自己面前的起點，和「大概開到這裡」的中線記號
-  const go = new THREE.Group();
-  for (let i = 0; i < 10; i++) {
-    const left = i < 5;
-    const z = 7 - (i % 5) * 1.5;
-    const team = tapeMat(left ? TEAM.left : TEAM.right, 0.85);
-    strip(go, 0.36, 0.36, left ? 1 : 9, z, team);
-    strip(go, 0.08, 0.9, left ? 3 : 7, z, tape);
-  }
-  groups[0].add(go);
-  groups[1].add(go.clone());
-
-  // 拉鍊：藍隊、橘隊各自的半條路
-  for (let i = 0; i < 10; i++)
-    strip(groups[2], 7.4, 0.05, 5, zipLane(i), tapeMat(i < 5 ? TEAM.left : TEAM.right, 0.55));
-
-  // 圍圈圈、繞圈圈：圓形膠帶
-  dashedCircle(groups[3], RING_R, tape);
-  dashedCircle(groups[4], RING_R, tape);
-  // 中間集合：小圈
-  dashedCircle(groups[5], 1.6, tape, 22);
-  // 魚造型：✕ 點
-  FISH_MARKS.forEach((p) => cross(groups[6], p.x, p.z, tapeMat('#ff7a3d')));
-  // 前面一直線
-  strip(groups[7], 9.2, 0.08, 5, LINE_Z, tape);
-  strip(groups[8], 9.2, 0.08, 5, LINE_Z, tape);
+  // 每種卡片的膠帶記號第一次用到時才建立
+  const groups = new Map<number, THREE.Group>();
+  const groupOf = (type: number) => {
+    if (!groups.has(type)) {
+      const g = new THREE.Group();
+      buildMarks(g, freeCard(type).marks);
+      root.add(g);
+      groups.set(type, g);
+    }
+    return groups.get(type)!;
+  };
 
   const koi = buildKoi();
   scene.add(koi.group);
@@ -132,7 +140,8 @@ export function createFreeMarks(scene: THREE.Scene) {
   return {
     /** type 為自由走位卡片時顯示對應膠帶；koi 為鯉魚道具的出現程度 0–1。 */
     update(type: number | null, koiAmount: number, now: number) {
-      groups.forEach((g, k) => (g.visible = type === FREE_FIRST + k));
+      const shown = type !== null && isFree(type) ? groupOf(type) : null;
+      groups.forEach((g) => (g.visible = g === shown));
       koi.group.visible = koiAmount > 0;
       if (koiAmount > 0) {
         // 放下時輕輕彈一下

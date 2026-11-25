@@ -84,27 +84,31 @@ test('換位延續前段燈色並調暗', () => {
   assert.ok(sample(s, move.start + 1).brightness[0] < 1);
 });
 
-import { standardShow, FREE_FIRST } from './freeShow.ts';
-test('鯉魚十球秀（新）：60 秒、無換位、標準路線不相撞且速度溫和', () => {
-  const s = compile(standardShow());
-  assert.equal(s.at(-1)!.end, 60);
-  assert.equal(s.filter((x) => x.transition).length, 0);
-  let minGap = Infinity,
-    maxSpeed = 0;
-  let prev = sample(s, 0).points;
-  for (let t = 0.01; t < 60; t += 0.01) {
-    const p = sample(s, t).points;
-    for (let a = 0; a < 10; a++) {
-      assert.ok(p[a].x >= 0.4 && p[a].x <= 9.6 && p[a].z >= 0.4 && p[a].z <= 7.6, `出界 t=${t} ball=${a}`);
-      maxSpeed = Math.max(maxSpeed, Math.hypot(p[a].x - prev[a].x, p[a].z - prev[a].z) / 0.01);
-      for (let b = a + 1; b < 10; b++)
-        minGap = Math.min(minGap, Math.hypot(p[a].x - p[b].x, p[a].z - p[b].z));
+import { standardShow, FREE_FIRST, SHOWS, showCards, freeCard } from './freeShow.ts';
+for (const { id, title } of SHOWS)
+  test(`${title}：60 秒、無換位、標準路線不出界、不相撞且速度溫和`, () => {
+    const s = compile(showCards(id));
+    assert.equal(s.at(-1)!.end, 60);
+    assert.equal(s.filter((x) => x.transition).length, 0);
+    let minGap = Infinity,
+      maxSpeed = 0;
+    let prev = sample(s, 0).points;
+    for (let t = 0.01; t < 60; t += 0.01) {
+      const p = sample(s, t).points;
+      for (let a = 0; a < 10; a++) {
+        assert.ok(p[a].x >= 0.4 && p[a].x <= 9.6 && p[a].z >= 0.4 && p[a].z <= 7.6, `出界 t=${t} ball=${a}`);
+        maxSpeed = Math.max(maxSpeed, Math.hypot(p[a].x - prev[a].x, p[a].z - prev[a].z) / 0.01);
+        for (let b = a + 1; b < 10; b++)
+          minGap = Math.min(minGap, Math.hypot(p[a].x - p[b].x, p[a].z - p[b].z));
+      }
+      prev = p;
     }
-    prev = p;
-  }
-  assert.ok(minGap >= 0.7, `球距 ${minGap.toFixed(2)} m`);
-  assert.ok(maxSpeed <= 1.6, `最高速 ${maxSpeed.toFixed(2)} m/s`);
-});
+    assert.ok(minGap >= 0.7, `球距 ${minGap.toFixed(2)} m`);
+    assert.ok(maxSpeed <= 1.6, `最高速 ${maxSpeed.toFixed(2)} m/s`);
+    // 每段都有「做什麼」和「做不到也沒關係」，最後一段是謝幕
+    assert.ok(showCards(id).every((c) => freeCard(c.type).tip.kid && freeCard(c.type).tip.ok));
+    assert.ok(freeCard(showCards(id).at(-1)!.type).bow);
+  });
 test('自由走位與球道節目可以混排：自動換位、倒數沿用自由隊形', () => {
   const free = standardShow();
   const c = [...template().slice(0, 2), free[3], { id: 'cd', type: 5, duration: 7 }, template()[0]];
