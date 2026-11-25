@@ -40,18 +40,26 @@ const TURN = Math.PI * 0.6; // 繞圈圈：一起轉約三分之一圈
 const ringAt = (i: number, f: number, r = RING_R): Pt => polar(angOf(RING_A[i]) + TURN * f, r);
 const RING_END = ids.map((i) => ringAt(i, 1));
 const HUDDLE = ids.map((i) => ringAt(i, 1, 1.6));
-/** 魚形膠帶點（魚頭朝右）：點與點至少相距 1.2 m。 */
+/**
+ * 地上的平面大鯉魚：Lester 提供的圓胖小鯉魚圖（魚頭朝右），放大平鋪在舞台中間。
+ * 圖片中心與尺寸（公尺）；身體約 5.6 公尺寬，連尾巴約 7.3 公尺長。
+ */
+export const KOI_IMAGE = { x: 5.208, z: 3.788, w: 10.948, h: 6.644 };
+/**
+ * 魚形 ✕ 點：沿著圖中魚的輪廓（含背鰭、兩片尾鰭）往外 0.28 m，
+ * 球停在這些點上就剛好貼著魚邊；點與點至少相距 1.6 m。
+ */
 export const FISH_MARKS: Pt[] = [
-  { x: 8.1, z: 4 },
-  { x: 6.9, z: 2.3 },
-  { x: 5.2, z: 1.8 },
-  { x: 3.6, z: 2.3 },
-  { x: 2.0, z: 1.6 },
-  { x: 2.7, z: 4 },
-  { x: 2.0, z: 6.4 },
-  { x: 3.6, z: 5.7 },
-  { x: 5.2, z: 6.2 },
-  { x: 6.9, z: 5.7 },
+  { x: 8.48, z: 5.02 },
+  { x: 7.06, z: 6.55 },
+  { x: 5.09, z: 7.0 },
+  { x: 3.26, z: 6.21 },
+  { x: 0.92, z: 4.86 },
+  { x: 0.97, z: 3.25 },
+  { x: 3.32, z: 1.79 },
+  { x: 4.99, z: 0.43 },
+  { x: 6.95, z: 1.32 },
+  { x: 8.45, z: 2.86 },
 ];
 const FISH = matchByAngle(HUDDLE, FISH_MARKS);
 export const LINE_Z = 6.9;
@@ -162,26 +170,29 @@ export const koiCards: FreeCard[] = [
   {
     show: 'koi',
     name: '排魚造型',
-    duration: 8,
-    summary: '老師放上鯉魚道具，大家開到魚形的點上',
-    tip: { kid: '開到魚形膠帶的 ✕ 點上', ok: '點和點之間很寬，大概在附近就看得出是一條魚' },
+    duration: 7,
+    summary: '老師在地上鋪一條大鯉魚，大家開到魚的邊緣圍著它',
+    tip: {
+      kid: '開到大鯉魚旁邊的 ✕ 點上，貼著魚身、尾巴和背鰭停好',
+      ok: '沒貼準也沒關係，圍在魚旁邊就看得出是一條魚',
+    },
     from: HUDDLE,
     to: FISH,
-    move: [0.6, 4.6],
-    lights: (t) => lights((i, c) => (c[i] = t > 6 ? GOLD : t > 4.6 ? '#ff7a3d' : RAINBOW[i])),
+    move: [0.8, 4.6],
+    lights: (t) => lights((i, c) => (c[i] = t > 5.6 ? GOLD : t > 4.6 ? '#ff7a3d' : RAINBOW[i])),
     subtitle: (t) => (t < 4.6 ? '鯉魚來了！排魚造型' : '是一條大鯉魚！'),
     marks: [{ k: 'x', pts: FISH_MARKS, color: '#ff7a3d' }],
-    koi: (t) => clamp01((t - 1.6) / 0.8),
+    koi: (t) => clamp01(t / 0.6),
   },
   {
     show: 'koi',
     name: '到前面排一直線',
-    duration: 6,
+    duration: 7,
     summary: '開到舞台前面的膠帶線上',
     tip: { kid: '把球開到舞台前面的膠帶線上', ok: '排得不直也沒關係，像一排小朋友在等拍照' },
     from: FISH,
     to: LINE,
-    move: [0.2, 5.6],
+    move: [0.2, 6.6],
     lights: rainbow,
     subtitle: () => '到前面排一直線',
     marks: [{ k: 'line', z: LINE_Z }],

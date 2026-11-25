@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { freeCard, isFree, type Mark } from '../freeShow';
 import { C as FREE_CENTER } from '../shows/kit';
+import { KOI_IMAGE } from '../shows/koi';
+import koiUrl from '../assets/koi-fish.png';
 import { TEAM } from './palette';
 
 /*
@@ -53,44 +55,28 @@ function cross(parent: THREE.Object3D, x: number, z: number, m: THREE.Material) 
   strip(parent, 0.42, 0.08, x, z, m, -Math.PI / 4);
 }
 
-/** 低多邊形鯉魚道具：老師放在舞台中間，魚頭朝右。 */
+/** 平鋪在地上的大鯉魚（Lester 提供的圖）：球排在牠的邊緣上。 */
 function buildKoi() {
-  const g = new THREE.Group();
-  const orange = new THREE.MeshStandardMaterial({
-    color: '#ff7a3d',
-    flatShading: true,
-    roughness: 0.55,
+  const K = KOI_IMAGE;
+  const tex = new THREE.TextureLoader().load(koiUrl);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  const material = new THREE.MeshStandardMaterial({
+    map: tex,
     transparent: true,
+    alphaTest: 0.02,
+    roughness: 0.85,
+    depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -1,
   });
-  const white = new THREE.MeshStandardMaterial({
-    color: '#fffaf0',
-    flatShading: true,
-    roughness: 0.6,
-    transparent: true,
-  });
-  const ink = new THREE.MeshStandardMaterial({ color: '#1f2a1c', roughness: 0.4, transparent: true });
-  const body = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), orange);
-  body.scale.set(0.8, 0.28, 0.38);
-  body.position.y = 0.28;
-  const tail = new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.55, 4), orange);
-  tail.rotation.z = -Math.PI / 2;
-  tail.scale.set(1, 1, 0.3);
-  tail.position.set(-0.95, 0.3, 0);
-  const spot1 = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 6), white);
-  spot1.scale.set(1.3, 0.5, 1);
-  spot1.position.set(-0.15, 0.5, 0.05);
-  const spot2 = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 6), white);
-  spot2.scale.set(1.2, 0.5, 1);
-  spot2.position.set(0.35, 0.46, -0.08);
-  const eyes = [-1, 1].map((s) => {
-    const e = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), ink);
-    e.position.set(0.62, 0.36, s * 0.22);
-    return e;
-  });
-  g.add(body, tail, spot1, spot2, ...eyes);
-  g.traverse((o) => (o.castShadow = true));
-  g.position.set(FREE_CENTER.x, 0, FREE_CENTER.z);
-  return { group: g, materials: [orange, white, ink] };
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(K.w, K.h), material);
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.receiveShadow = true;
+  const group = new THREE.Group();
+  group.add(mesh);
+  group.position.set(K.x, 0.036, K.z);
+  return { group, materials: [material] };
 }
 
 const teamOf = (x: number) => (x < 5 ? TEAM.left : TEAM.right);
@@ -145,9 +131,8 @@ export function createFreeMarks(scene: THREE.Scene) {
       koi.group.visible = koiAmount > 0;
       if (koiAmount > 0) {
         // 放下時輕輕彈一下
-        const pop = 1 + Math.sin(Math.min(1, koiAmount) * Math.PI) * 0.15;
-        koi.group.scale.setScalar(Math.max(0.01, koiAmount) * pop);
-        koi.group.rotation.y = Math.sin(now * 1.4) * 0.05;
+        const pop = 1 + Math.sin(Math.min(1, koiAmount) * Math.PI) * 0.06;
+        koi.group.scale.set(pop, 1, pop);
         koi.materials.forEach((m) => (m.opacity = Math.min(1, koiAmount * 1.4)));
       }
     },
